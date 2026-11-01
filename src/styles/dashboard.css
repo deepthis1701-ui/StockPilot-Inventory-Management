@@ -1,0 +1,662 @@
+/* =========================================================
+   STOCKPILOT — DASHBOARD
+   Clean Professional Inventory Dashboard
+   ========================================================= */
+
+.dash-greeting {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.dash-greeting h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.4px;
+}
+
+.dash-greeting p {
+  margin: 7px 0 0;
+  color: #7a8494;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dash-date-selector {
+  flex-shrink: 0;
+}
+
+.dash-date-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #e1e5ea;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #596474;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dash-date-pill svg {
+  color: #5268d8;
+}
+
+
+/* =========================================================
+   COMMON DASHBOARD LAYOUT
+   ========================================================= */
+
+.section-spacing {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.section-subtitle {
+  margin: 4px 0 14px;
+  color: #8992a0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   KPI CARDS
+   ========================================================= */
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.grid-4 .card,
+.grid-3 .card,
+.grid-2 .card {
+  min-width: 0;
+}
+
+.card {
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid #e3e7ec;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(20, 30, 50, 0.025);
+}
+
+.grid-4 .card {
+  min-height: 128px;
+  padding: 18px;
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.card-label {
+  color: #7d8795;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.card-value {
+  margin-top: 6px;
+  color: #172033;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+
+.card-footer {
+  margin-top: 16px;
+  color: #9aa2ae;
+  font-size: 11px;
+}
+
+.icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
+.icon-box.blue {
+  background: #eef2ff;
+  color: #5268d8;
+}
+
+.icon-box.purple {
+  background: #f3efff;
+  color: #7958c9;
+}
+
+.icon-box.orange {
+  background: #fff5e8;
+  color: #d88916;
+}
+
+.icon-box.green {
+  background: #edf8f1;
+  color: #29965a;
+}
+
+
+/* =========================================================
+   ATTENTION
+   ========================================================= */
+
+.attention-card {
+  min-width: 0;
+  padding: 17px;
+  border: 1px solid #e3e7ec;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.attention-card-header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.attention-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
+.attention-icon.critical {
+  background: #fff1f1;
+  color: #d64545;
+}
+
+.attention-icon.reorder {
+  background: #eef3ff;
+  color: #5268d8;
+}
+
+.attention-icon.overstock {
+  background: #eef9f5;
+  color: #31966a;
+}
+
+.attention-card-title {
+  color: #273142;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attention-card-count {
+  margin-top: 3px;
+  color: #8b94a2;
+  font-size: 11px;
+}
+
+.attention-card-desc {
+  min-height: 34px;
+  margin: 14px 0;
+  color: #737d8b;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.attention-card .btn {
+  width: 100%;
+}
+
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #dfe4ea;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #566171;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-primary {
+  border-color: #5268d8;
+  background: #5268d8;
+  color: #ffffff;
+}
+
+.btn-danger {
+  border-color: #d95353;
+  background: #d95353;
+  color: #ffffff;
+}
+
+.btn:hover {
+  opacity: 0.92;
+}
+
+.btn-sm {
+  min-height: 29px;
+  padding: 0 10px;
+}
+
+
+/* =========================================================
+   TOP SELLING PRODUCTS
+   ========================================================= */
+
+.top-product-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 13px 0;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.top-product-row:last-child {
+  border-bottom: 0;
+}
+
+.top-product-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  flex-shrink: 0;
+  border: 1px solid #e1e5ea;
+  border-radius: 7px;
+  background: #f7f8fa;
+  color: #8b94a2;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.top-product-rank.top3 {
+  border-color: #dbe2ff;
+  background: #eef2ff;
+  color: #5268d8;
+}
+
+.top-product-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.top-product-name {
+  overflow: hidden;
+  color: #273142;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-product-units {
+  margin-top: 3px;
+  color: #929aa7;
+  font-size: 10px;
+}
+
+.top-product-trend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.top-product-trend.up {
+  color: #29965a;
+}
+
+.top-product-trend.down {
+  color: #d64545;
+}
+
+
+/* =========================================================
+   LOW STOCK
+   ========================================================= */
+
+.low-stock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf0f3;
+}
+
+.low-stock-row:last-child {
+  border-bottom: 0;
+}
+
+.low-stock-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.low-stock-name {
+  overflow: hidden;
+  color: #273142;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.low-stock-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  color: #929aa7;
+  font-size: 10px;
+}
+
+.low-stock-bar {
+  width: 100%;
+  max-width: 230px;
+  height: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #edf0f3;
+}
+
+.low-stock-bar-fill {
+  height: 100%;
+  border-radius: 20px;
+}
+
+.low-stock-bar-fill.critical {
+  background: #d95353;
+}
+
+.low-stock-bar-fill.medium {
+  background: #e6a23c;
+}
+
+.low-stock-bar-fill.low {
+  background: #38a169;
+}
+
+
+/* =========================================================
+   BADGES
+   ========================================================= */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 23px;
+  padding: 0 7px;
+  border-radius: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge-danger {
+  background: #fff0f0;
+  color: #c83f3f;
+}
+
+.badge-warning {
+  background: #fff6e7;
+  color: #b97917;
+}
+
+.badge-success {
+  background: #edf8f1;
+  color: #278452;
+}
+
+
+/* =========================================================
+   INVENTORY HEALTH
+   ========================================================= */
+
+.health-summary {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding: 8px 20px;
+}
+
+.health-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 43px;
+  border-bottom: 1px solid #edf0f3;
+  color: #566171;
+  font-size: 12px;
+}
+
+.health-summary-row:last-child {
+  border-bottom: 0;
+}
+
+.health-summary-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.health-summary-value {
+  color: #273142;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.status-dot.success {
+  background: #38a169;
+}
+
+.status-dot.warning {
+  background: #e6a23c;
+}
+
+.status-dot.danger {
+  background: #d95353;
+}
+
+.donut-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.donut-center-value {
+  color: #172033;
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.donut-center-label {
+  margin-top: 5px;
+  color: #929aa7;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   REORDER TABLE
+   ========================================================= */
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.mini-rec-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.mini-rec-table th {
+  padding: 11px 13px;
+  border-bottom: 1px solid #e1e5ea;
+  background: #f8f9fb;
+  color: #7d8795;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mini-rec-table td {
+  padding: 13px;
+  border-bottom: 1px solid #edf0f3;
+  color: #697383;
+  white-space: nowrap;
+}
+
+.mini-rec-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.mini-rec-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.mini-rec-table td:first-child {
+  color: #273142;
+}
+
+
+/* =========================================================
+   INVENTORY HEALTH CARD
+   ========================================================= */
+
+.grid-2 > .card {
+  padding: 18px;
+}
+
+.grid-2 > .card .card-header {
+  margin-bottom: 4px;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-greeting {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 600px) {
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-greeting {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .dash-greeting h2 {
+    font-size: 21px;
+  }
+
+  .dash-date-pill {
+    height: 34px;
+  }
+
+  .attention-card {
+    padding: 15px;
+  }
+
+  .grid-2 > .card {
+    padding: 15px;
+  }
+
+  .health-summary {
+    padding: 8px 4px;
+  }
+}
