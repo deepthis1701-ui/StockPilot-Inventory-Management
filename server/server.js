@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createHash } from 'node:crypto';
 import express from 'express';
 import cors from 'cors';
 import connectDB from './db.js';
@@ -428,6 +429,134 @@ app.get('/api/stock-movements', asyncRoute(async (req, res) => {
   const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
   const movements = await StockMovement.find(filter).sort({ occurredAt: -1 }).limit(limit).lean();
   res.json({ count: movements.length, movements });
+}));
+
+// Import historical POS/CSV sales without changing today's on-hand stock.
+// This endpoint is intentionally separate from POST /api/sales.
+app.post('/api/sales/import', asyncRoute(async (req, res) => {
+  const rows = req.body?.rows;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'Upload a CSV containing at least one sales row.' });
+  }
+  if (rows.length > 5000) {
+    return res.status(413).json({ error: 'A single import is limited to 5,000 rows. Split larger files into smaller imports.' });
+  }
+
+  const today = new Date();
+  const earliestAllowed = new Date(today.getTime() - 730 * 24 * 60 * 60 * 1000);
+  const allowedChannels = new Set(['counter', 'online', 'wholesale', 'other']);
+  const skuValues = [...new Set(rows.map((row) => String(row?.sku || '').trim().toUpperCase()).filter(Boolean))];
+  const products = await Product.find({ isActive: true, sku: { $in: skuValues } }).lean();
+  const productBySku = new Map(products.map((product) => [product.sku.toUpperCase(), product]));
+  const validationErrors = [];
+  const normalizedRows = [];
+
+  rows.forEach((row, index) => {
+    const rowNumber = index + 2;
+    const sku = String(row?.sku || '').trim().toUpperCase();
+    const product = productBySku.get(sku);
+    const quantity = Number(row?.quantity);
+    const rawDate = row?.transactionDate ?? row?.date;
+    const transactionDate = rawDate ? new Date(rawDate) : new Date('invalid');
+    const hasValidDate = !Number.isNaN(transactionDate.getTime());
+    const unitPriceRaw = row?.unitPrice ?? row?.unit_price ?? row?.price;
+    const unitPrice = unitPriceRaw === '' || unitPriceRaw === undefined || unitPriceRaw === null
+      ? Number(product?.sellingPrice || 0)
+      : Number(unitPriceRaw);
+    const channel = String(row?.channel || 'counter').trim().toLowerCase();
+    const reference = String(row?.reference || '').trim().slice(0, 120);
+
+    if (!sku) validationErrors.push({ row: rowNumber, message: 'SKU is required.' });
+    else if (!product) validationErrors.push({ row: rowNumber, message: 'No active product matches SKU ' + sku + '.' });
+
+    if (!positiveNumber(quantity)) {
+      validationErrors.push({ row: rowNumber, message: 'Quantity must be a number greater than zero.' });
+    }
+
+    if (!hasValidDate) {
+      validationErrors.push({ row: rowNumber, message: 'Date must be valid. Use YYYY-MM-DD.' });
+    } else if (transactionDate > today) {
+      validationErrors.push({ row: rowNumber, message: 'Future-dated sales cannot be imported.' });
+    } else if (transactionDate < earliestAllowed) {
+      validationErrors.push({ row: rowNumber, message: 'Import is limited to the most recent 730 days.' });
+    }
+
+    if (!nonNegativeNumber(unitPrice)) {
+      validationErrors.push({ row: rowNumber, message: 'Unit price must be zero or greater.' });
+    }
+
+    if (!allowedChannels.has(channel)) {
+      validationErrors.push({ row: rowNumber, message: 'Channel must be counter, online, wholesale or other.' });
+    }
+
+    if (product && positiveNumber(quantity) && hasValidDate && transactionDate <= today &&
+        transactionDate >= earliestAllowed && nonNegativeNumber(unitPrice) && allowedChannels.has(channel)) {
+      normalizedRows.push({
+        rowNumber,
+        productId: String(product._id),
+        sku: product.sku,
+        productName: product.name,
+        quantity,
+        unitPrice,
+        totalAmount: Number((quantity * unitPrice).toFixed(2)),
+        channel,
+        reference,
+        transactionDate: transactionDate.toISOString()
+      });
+    }
+  });
+
+  if (validationErrors.length) {
+    return res.status(400).json({
+      error: 'The sales file contains invalid rows. No transactions were imported.',
+      errorCount: validationErrors.length,
+      errors: validationErrors.slice(0, 100)
+    });
+  }
+
+  const batchId = createHash('sha256')
+    .update(JSON.stringify(normalizedRows))
+    .digest('hex');
+
+  const existingCount = await SalesTransaction.countDocuments({ importBatchId: batchId });
+  if (existingCount > 0) {
+    return res.status(409).json({
+      error: 'This exact sales file has already been imported.',
+      importBatchId: batchId,
+      previouslyImportedRows: existingCount
+    });
+  }
+
+  const documents = normalizedRows.map((row) => ({
+    productId: row.productId,
+    sku: row.sku,
+    productName: row.productName,
+    quantity: row.quantity,
+    unitPrice: row.unitPrice,
+    totalAmount: row.totalAmount,
+    channel: row.channel,
+    reference: row.reference,
+    transactionDate: new Date(row.transactionDate),
+    source: 'csv_import',
+    importBatchId: batchId,
+    importRowNumber: row.rowNumber
+  }));
+
+  try {
+    await SalesTransaction.insertMany(documents, { ordered: true });
+  } catch (error) {
+    // Compensate if the database inserted only part of the batch.
+    await SalesTransaction.deleteMany({ importBatchId: batchId });
+    throw error;
+  }
+
+  res.status(201).json({
+    message: 'Historical sales imported successfully.',
+    importedRows: documents.length,
+    importBatchId: batchId,
+    stockUpdated: false,
+    note: 'Historical sales are used for demand analysis and do not change current on-hand inventory.'
+  });
 }));
 
 app.get('/api/sales', asyncRoute(async (req, res) => {
