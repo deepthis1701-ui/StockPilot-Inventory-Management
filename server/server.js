@@ -82,7 +82,13 @@ async function createInventorySnapshot() {
     }
 
     const totalUnits = dailySeries.reduce((sum, value) => sum + value, 0);
-    const averageDailyDemand = totalUnits > 0 ? totalUnits / 28 : null;
+    const observedSalesDays = dailySeries.filter((value) => value > 0).length;
+    // A single sale (or a few isolated transactions) is not enough to
+    // support a stable demand estimate or an overstock/reorder classification.
+    const hasEnoughSalesHistory = observedSalesDays >= 7;
+    const averageDailyDemand = hasEnoughSalesHistory
+      ? totalUnits / 28
+      : null;
     const variance = averageDailyDemand === null
       ? 0
       : dailySeries.reduce((sum, value) => sum + Math.pow(value - averageDailyDemand, 2), 0) / 28;
@@ -147,6 +153,8 @@ async function createInventorySnapshot() {
       predictedDailyDemand: averageDailyDemand,
       predicted_daily_demand: averageDailyDemand,
       salesHistoryDays: 28,
+      observedSalesDays,
+      hasEnoughSalesHistory,
       leadTime,
       lead_time_days: leadTime,
       safetyStock,
@@ -164,7 +172,7 @@ async function createInventorySnapshot() {
       overallRisk,
       overall_risk: overallRisk,
       risk: overallRisk,
-      status: overallRisk === 'High' ? 'Critical' : overallRisk === 'Medium' ? 'Attention' : overallRisk === 'Unknown' ? 'No Sales History' : 'Healthy',
+      status: overallRisk === 'High' ? 'Critical' : overallRisk === 'Medium' ? 'Attention' : overallRisk === 'Unknown' ? 'Insufficient Sales History' : 'Healthy',
       forecast_status: averageDailyDemand === null ? 'insufficient_history' : 'baseline_from_actual_sales',
       forecast_source: averageDailyDemand === null ? null : '28_day_sales_baseline'
     };
