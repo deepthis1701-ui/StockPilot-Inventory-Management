@@ -23,146 +23,25 @@ import {
   CalendarDays,
   ChevronRight,
   CheckCircle2,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 import {
   getSales,
   getSalesDemandStats,
+  importHistoricalSales,
 } from '../services/api.js';
 
-import {
-  categoryPerformance,
-} from '../data/sampleData.js';
-
-
 /* =========================================================
-   STATIC BUSINESS DATA
+   LIVE BUSINESS DATA
 ========================================================= */
 
-const topProducts = [
-  {
-    name: 'Fresh Milk 1L',
-    category: 'Dairy',
-    units: 1248,
-    revenue: 49920,
-    growth: 12.4,
-  },
-  {
-    name: 'Farm Fresh Eggs',
-    category: 'Dairy',
-    units: 846,
-    revenue: 42300,
-    growth: 8.2,
-  },
-  {
-    name: 'Basmati Rice 5kg',
-    category: 'Grains',
-    units: 782,
-    revenue: 39100,
-    growth: 6.4,
-  },
-  {
-    name: 'Fresh Tomatoes',
-    category: 'Vegetables',
-    units: 731,
-    revenue: 21930,
-    growth: 15.1,
-  },
-  {
-    name: 'Sunflower Oil 1L',
-    category: 'Cooking',
-    units: 694,
-    revenue: 27760,
-    growth: 4.8,
-  },
-];
-
-const attentionProducts = [
-  {
-    name: 'Fresh Tomatoes',
-    category: 'Vegetables',
-    severity: 'critical',
-    stock: 80,
-    coverage: 3,
-    demand: 28,
-    action: 'Restock now',
-  },
-  {
-    name: 'Fresh Milk 1L',
-    category: 'Dairy',
-    severity: 'warning',
-    stock: 120,
-    coverage: 6,
-    demand: 18,
-    action: 'Review order',
-  },
-  {
-    name: 'Farm Fresh Eggs',
-    category: 'Dairy',
-    severity: 'monitor',
-    stock: 250,
-    coverage: 8,
-    demand: 30,
-    action: 'Monitor',
-  },
-];
-
-const upcomingDemand = [
-  {
-    name: 'Fresh Milk 1L',
-    current: 120,
-    expected: 180,
-    growth: 12,
-    action: 'Restock',
-  },
-  {
-    name: 'Farm Fresh Eggs',
-    current: 250,
-    expected: 210,
-    growth: 8,
-    action: 'Healthy',
-  },
-  {
-    name: 'Basmati Rice 5kg',
-    current: 320,
-    expected: 275,
-    growth: 6,
-    action: 'Healthy',
-  },
-  {
-    name: 'Fresh Tomatoes',
-    current: 80,
-    expected: 140,
-    growth: 15,
-    action: 'Restock',
-  },
-  {
-    name: 'Sunflower Oil 1L',
-    current: 190,
-    expected: 165,
-    growth: 4,
-    action: 'Monitor',
-  },
-];
-
-const fallbackSalesData = [
-  { date: 'Mon', value: 19800 },
-  { date: 'Tue', value: 22400 },
-  { date: 'Wed', value: 21100 },
-  { date: 'Thu', value: 24600 },
-  { date: 'Fri', value: 26900 },
-  { date: 'Sat', value: 29800 },
-  { date: 'Sun', value: 28400 },
-];
-
-const fallbackCategoryData = [
-  { category: 'Dairy', sales: 145000 },
-  { category: 'Grains', sales: 118000 },
-  { category: 'Vegetables', sales: 97000 },
-  { category: 'Cooking', sales: 89000 },
-  { category: 'Snacks', sales: 76000 },
-  { category: 'Beverages', sales: 69000 },
-];
+const topProducts = [];
+const attentionProducts = [];
+const upcomingDemand = [];
+const fallbackSalesData = [];
+const fallbackCategoryData = [];
 
 
 /* =========================================================
@@ -181,7 +60,7 @@ function normalizeSalesData(response) {
     [];
 
   if (!Array.isArray(raw) || raw.length === 0) {
-    return fallbackSalesData;
+    return [];
   }
 
   return raw.map((item, index) => ({
@@ -205,11 +84,10 @@ function normalizeCategoryData(response) {
   const raw =
     response?.data ||
     response?.categories ||
-    categoryPerformance ||
     [];
 
   if (!Array.isArray(raw) || raw.length === 0) {
-    return fallbackCategoryData;
+    return [];
   }
 
   const result = raw
@@ -229,7 +107,7 @@ function normalizeCategoryData(response) {
     }))
     .filter((item) => item.sales > 0);
 
-  return result.length > 0 ? result : fallbackCategoryData;
+  return result;
 }
 
 
@@ -296,16 +174,20 @@ export default function SalesDemand() {
   );
 
   const [stats, setStats] = useState({
-    totalSales: 697412,
-    unitsSold: 8204,
-    averageDailyDemand: 273,
-    salesGrowth: 6.2,
+    totalSales: 0,
+    unitsSold: 0,
+    averageDailyDemand: 0,
+    salesGrowth: 0,
   });
 
   const [range, setRange] = useState('daily');
   const [metric, setMetric] = useState('revenue');
 
   const [loading, setLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
+  const [importError, setImportError] = useState('');
 
 
   /* =====================================================
@@ -333,28 +215,28 @@ export default function SalesDemand() {
               statsResponse.totalSales ??
               statsResponse.total_sales ??
               statsResponse.revenue ??
-              697412
+              0
             ),
 
           unitsSold:
             Number(
               statsResponse.unitsSold ??
               statsResponse.units_sold ??
-              8204
+              0
             ),
 
           averageDailyDemand:
             Number(
               statsResponse.averageDailyDemand ??
               statsResponse.average_daily_demand ??
-              273
+              0
             ),
 
           salesGrowth:
             Number(
               statsResponse.salesGrowth ??
               statsResponse.sales_growth ??
-              6.2
+              0
             ),
         });
       }
@@ -381,11 +263,7 @@ export default function SalesDemand() {
   ===================================================== */
 
   useEffect(() => {
-    setCategoryData(
-      normalizeCategoryData({
-        data: categoryPerformance,
-      })
-    );
+    setCategoryData([]);
   }, []);
 
 
@@ -483,6 +361,35 @@ export default function SalesDemand() {
       </div>
 
 
+      <section className="sp-card" style={{ marginBottom: 24 }}>
+        <div className="sp-card-header">
+          <div><div className="sp-section-kicker">HISTORICAL DATA</div><h2>Import sales history</h2>
+            <p>Upload a CSV exported from your billing or POS system. Historical imports enrich reports and forecasts without changing current stock.</p></div>
+          <FileSpreadsheet size={28} />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          <input type="file" accept=".csv,text/csv" onChange={(event) => { setSelectedFile(event.target.files?.[0] || null); setImportMessage(''); setImportError(''); }} />
+          <button className="sp-refresh-btn" disabled={!selectedFile || importBusy} onClick={async () => {
+            setImportBusy(true); setImportMessage(''); setImportError('');
+            try {
+              const csvText = (await selectedFile.text()).replace(/^\uFEFF/, '');
+              const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
+              if (lines.length < 2) throw new Error('CSV must contain a header and at least one data row.');
+              const parseLine = (line) => { const cells = []; let value = ''; let quoted = false; for (let i = 0; i < line.length; i += 1) { const char = line[i]; if (char === '"' && quoted && line[i + 1] === '"') { value += '"'; i += 1; } else if (char === '"') quoted = !quoted; else if (char === ',' && !quoted) { cells.push(value.trim()); value = ''; } else value += char; } cells.push(value.trim()); return cells; };
+              const headers = parseLine(lines[0]).map((value) => value.toLowerCase().replace(/[\s-]+/g, '_'));
+              const dateKey = headers.includes('date') ? 'date' : 'transaction_date';
+              for (const required of [dateKey, 'sku', 'quantity']) if (!headers.includes(required)) throw new Error('Missing required CSV column: ' + required);
+              const rows = lines.slice(1).map((line) => { const values = parseLine(line); const record = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ''])); return { date: record.date || record.transaction_date, sku: record.sku, quantity: record.quantity, unitPrice: record.unit_price || record.unitprice || record.price || undefined, channel: record.channel || 'counter', reference: record.reference || '' }; });
+              const result = await importHistoricalSales(rows);
+              setImportMessage(String(result.importedRows) + ' historical sales rows imported. Current stock was not changed.'); setSelectedFile(null); await loadSalesData();
+            } catch (error) { setImportError(error.message || 'Unable to import this CSV file.'); } finally { setImportBusy(false); }
+          }}> <Upload size={16} style={{ marginRight: 8 }} />{importBusy ? 'Importing...' : 'Import CSV'}</button>
+        </div>
+        <p style={{ fontSize: 12, color: '#64748b' }}>Required columns: date, sku, quantity. Optional: unit_price (or price), channel, reference. Dates must be within the last 730 days. Maximum 5,000 rows per import.</p>
+        {importMessage && <p style={{ color: '#15803d', fontWeight: 600 }}>{importMessage}</p>}
+        {importError && <p style={{ color: '#b91c1c', fontWeight: 600 }}>{importError}</p>}
+        <button type="button" onClick={() => { const csv = 'date,sku,quantity,unit_price,channel,reference\n2026-10-01,RICE-001,5,80,counter,POS-1001\n'; const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'stockpilot-sales-template.csv'; link.click(); URL.revokeObjectURL(url); }} style={{ border: 0, background: 'transparent', color: '#5268d8', cursor: 'pointer', padding: 0 }}>Download sample CSV template</button>
+      </section>
       {/* =================================================
           BUSINESS SUMMARY
       ================================================= */}
