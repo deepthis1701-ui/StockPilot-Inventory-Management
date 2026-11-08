@@ -1,9 +1,8 @@
 """Data-driven demand forecasting for StockPilot.
 
 The service trains a pooled model only when the retailer has enough historical
-observations across several products. Otherwise it uses a transparent seasonal
-naive baseline. Forecasts are withheld when an individual SKU has too little
-history; this avoids inventing demand for new or rarely sold products.
+observations across several products. Forecast selection is based on recursive
+multi-step backtesting against a transparent seasonal-naive baseline.
 """
 
 from __future__ import annotations
@@ -51,7 +50,7 @@ def _make_features(history: list[float], target_date: date) -> list[float]:
     values = np.asarray(history, dtype=float)
     last_7 = values[-7:]
     last_28 = values[-28:]
-    same_weekday = values[-7:: -7][:4] if len(values) >= 7 else values
+    same_weekday = values[-7::-7][:4] if len(values) >= 7 else values
 
     mean_7 = float(np.mean(last_7))
     mean_28 = float(np.mean(last_28))
@@ -78,9 +77,11 @@ def _make_features(history: list[float], target_date: date) -> list[float]:
 def _metrics(actual: np.ndarray, predicted: np.ndarray) -> dict[str, float | None]:
     if len(actual) == 0:
         return {"mae": None, "rmse": None, "wape": None}
+
     errors = np.abs(actual - predicted)
     denominator = float(np.sum(np.abs(actual)))
     wape = float(np.sum(errors) / denominator * 100.0) if denominator > 0 else None
+
     return {
         "mae": round(float(mean_absolute_error(actual, predicted)), 4),
         "rmse": round(float(np.sqrt(mean_squared_error(actual, predicted))), 4),
@@ -129,39 +130,74 @@ def _normalise_products(products: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _build_validation_data(series: list[dict[str, Any]]):
+    """Build training rows and full 14-day holdout windows per product.
+
+    The validation window is not exposed to the model one day at a time.
+    Instead, recursive forecasts use their own prior predictions during the
+    entire holdout, matching how a real multi-day forecast is generated.
+    """
     train_x, train_y = [], []
-    test_x, test_y, baseline_y, test_ids = [], [], [], []
+    validation_contexts = []
 
     for item in series:
         values = item["values"]
         count = len(values)
         validation_start = count - VALIDATION_DAYS
+
         if validation_start <= 28:
             continue
 
-        for index in range(28, count):
+        for index in range(28, validation_start):
             target_day = item["last_date"] - timedelta(days=count - 1 - index)
-            features = _make_features(values[:index], target_day)
-            actual = float(values[index])
-            baseline = float(values[index - 7])
+            train_x.append(_make_features(values[:index], target_day))
+            train_y.append(float(values[index]))
 
-            if index < validation_start:
-                train_x.append(features)
-                train_y.append(actual)
-            else:
-                test_x.append(features)
-                test_y.append(actual)
-                baseline_y.append(baseline)
-                test_ids.append(item["id"])
+        start_date = item["last_date"] - timedelta(days=count - 1 - validation_start)
+        validation_contexts.append({
+            "id": item["id"],
+            "history": list(values[:validation_start]),
+            "actual": list(values[validation_start:]),
+            "start_date": start_date,
+        })
 
     return (
         np.asarray(train_x, dtype=float),
         np.asarray(train_y, dtype=float),
-        np.asarray(test_x, dtype=float),
-        np.asarray(test_y, dtype=float),
-        np.asarray(baseline_y, dtype=float),
-        test_ids,
+        validation_contexts,
     )
+
+
+def _recursive_forecast(
+    history: list[float],
+    start_date: date,
+    horizon: int,
+    predictor: HistGradientBoostingRegressor | None = None,
+) -> list[float]:
+    """Forecast several days without using future actual values.
+
+    When predictor is None, repeat the last observed seven-day pattern.
+    Otherwise, recursively feed ML predictions back into the feature history.
+    """
+    future_values = list(history)
+    predictions = []
+
+    for step in range(horizon):
+        target_date = start_date + timedelta(days=step)
+
+        if predictor is None:
+            prediction = float(max(0.0, future_values[-7]))
+        else:
+            features = np.asarray(
+                [_make_features(future_values, target_date)],
+                dtype=float,
+            )
+            prediction = float(max(0.0, predictor.predict(features)[0]))
+
+        prediction = round(prediction, 4)
+        future_values.append(prediction)
+        predictions.append(prediction)
+
+    return predictions
 
 
 def generate_forecasts(
@@ -185,19 +221,39 @@ def generate_forecasts(
     model_metrics = None
     baseline_metrics = None
     selected_model = "seasonal_naive_7"
-    selection_reason = "Insufficient cross-product history to validate a machine-learning model; using a transparent seasonal baseline."
+    selection_reason = (
+        "Insufficient cross-product history to validate a machine-learning "
+        "model; using a transparent seasonal baseline."
+    )
 
-    train_x, train_y, test_x, test_y, baseline_y, test_ids = _build_validation_data(eligible)
+    train_x, train_y, validation_contexts = _build_validation_data(eligible)
 
-    if len(test_y):
-        baseline_metrics = _metrics(test_y, baseline_y)
+    validation_actual = np.asarray(
+        [value for context in validation_contexts for value in context["actual"]],
+        dtype=float,
+    )
+    baseline_predictions = np.asarray(
+        [
+            value
+            for context in validation_contexts
+            for value in _recursive_forecast(
+                context["history"],
+                context["start_date"],
+                len(context["actual"]),
+            )
+        ],
+        dtype=float,
+    )
+
+    if len(validation_actual):
+        baseline_metrics = _metrics(validation_actual, baseline_predictions)
 
     # Train a pooled model only when multiple products provide enough rows.
-    # The last 14 days of every eligible series are held out chronologically.
+    # Its selection score uses the same recursive 14-day horizon as production.
     if (
         len(eligible) >= MIN_GLOBAL_SERIES
         and len(train_y) >= MIN_GLOBAL_TRAIN_ROWS
-        and len(test_y) >= 30
+        and len(validation_actual) >= 30
     ):
         candidate = HistGradientBoostingRegressor(
             learning_rate=0.06,
@@ -208,14 +264,26 @@ def generate_forecasts(
             random_state=42,
         )
         candidate.fit(train_x, train_y)
-        candidate_predictions = np.maximum(candidate.predict(test_x), 0.0)
-        model_metrics = _metrics(test_y, candidate_predictions)
+
+        candidate_predictions = np.asarray(
+            [
+                value
+                for context in validation_contexts
+                for value in _recursive_forecast(
+                    context["history"],
+                    context["start_date"],
+                    len(context["actual"]),
+                    predictor=candidate,
+                )
+            ],
+            dtype=float,
+        )
+        model_metrics = _metrics(validation_actual, candidate_predictions)
 
         ml_wape = model_metrics["wape"]
         baseline_wape = baseline_metrics["wape"] if baseline_metrics else None
 
-        # The ML candidate must beat the seasonal-naive baseline on a
-        # chronological holdout. Otherwise the simpler baseline is retained.
+        # Require a meaningful improvement before using a more complex model.
         if (
             ml_wape is not None
             and baseline_wape is not None
@@ -223,18 +291,28 @@ def generate_forecasts(
         ):
             model = candidate
             selected_model = "hist_gradient_boosting"
-            selection_reason = "The pooled ML model achieved lower WAPE than the seasonal-naive baseline on the chronological validation window."
+            selection_reason = (
+                "The pooled ML model improved WAPE by more than 2% versus "
+                "the seasonal-naive baseline on a recursive 14-day holdout."
+            )
         else:
-            selection_reason = "The ML candidate did not beat the seasonal-naive baseline on the chronological validation window; the baseline was retained."
+            selection_reason = (
+                "The ML candidate did not beat the seasonal-naive baseline "
+                "on the recursive 14-day holdout; the baseline was retained."
+            )
     elif len(eligible) > 0:
         selection_reason = (
             "There is enough per-product history for a seasonal baseline, "
-            "but not enough cross-product validation data to trust a pooled ML model."
+            "but not enough cross-product validation data to trust a pooled "
+            "ML model."
         )
 
     rows = []
     target_id = str(target_product_id) if target_product_id else None
-    selected_series = [item for item in series if not target_id or item["id"] == target_id]
+    selected_series = [
+        item for item in series
+        if not target_id or item["id"] == target_id
+    ]
 
     for item in selected_series:
         values = item["values"]
@@ -264,28 +342,22 @@ def generate_forecasts(
             })
             continue
 
-        future_values = list(values)
-        forecast_series = []
         future_date = item["last_date"] + timedelta(days=1)
-
-        for step in range(forecast_days):
-            target_date = future_date + timedelta(days=step)
-            if model is not None:
-                features = np.asarray([_make_features(future_values, target_date)], dtype=float)
-                prediction = float(max(0.0, model.predict(features)[0]))
-            else:
-                # Repeat the most recent weekday pattern. This is an explicit
-                # baseline, not presented as a trained ML forecast.
-                prediction = float(max(0.0, future_values[-7]))
-
-            prediction = round(prediction, 4)
-            future_values.append(prediction)
-            forecast_series.append({
-                "date": target_date.isoformat(),
+        forecast_series = _recursive_forecast(
+            history=values,
+            start_date=future_date,
+            horizon=forecast_days,
+            predictor=model,
+        )
+        series_rows = [
+            {
+                "date": (future_date + timedelta(days=step)).isoformat(),
                 "predicted_demand": prediction,
-            })
+            }
+            for step, prediction in enumerate(forecast_series)
+        ]
 
-        total = float(sum(day["predicted_demand"] for day in forecast_series))
+        total = float(sum(forecast_series))
         rows.append({
             "id": item["id"],
             "product_id": item["id"],
@@ -298,11 +370,15 @@ def generate_forecasts(
             "history_days": history_days,
             "sales_days": sales_days,
             "model_used": selected_model,
-            "forecast_series": forecast_series,
+            "forecast_series": series_rows,
         })
 
-    available_count = sum(1 for row in rows if row["forecast_status"] == "forecast_available")
-    status = "ok" if available_count else ("no_products" if not selected_series else "insufficient_history")
+    available_count = sum(
+        1 for row in rows if row["forecast_status"] == "forecast_available"
+    )
+    status = "ok" if available_count else (
+        "no_products" if not selected_series else "insufficient_history"
+    )
 
     return {
         "status": status,
@@ -314,6 +390,7 @@ def generate_forecasts(
             "selection_reason": selection_reason,
             "training_series": len(eligible),
             "training_rows": int(len(train_y)),
+            "validation_method": f"recursive_{VALIDATION_DAYS}_day_holdout",
             "validation_days_per_series": VALIDATION_DAYS,
             "baseline_metrics": baseline_metrics,
             "ml_candidate_metrics": model_metrics,
