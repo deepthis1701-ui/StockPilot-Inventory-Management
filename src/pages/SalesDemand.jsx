@@ -206,6 +206,10 @@ export default function SalesDemand() {
     const demand = item.predictedDailyDemand ?? item.predicted_daily_demand;
     return demand !== null && demand !== undefined && Number(demand) > 0;
   });
+  const lowCoverageProducts = demandProducts.filter((item) =>
+    item.daysCoverage != null &&
+    Number(item.daysCoverage) <= Number(item.leadTime || 7)
+  );
   const handleImport = async () => {
     if (!selectedFile) return;
 
@@ -516,10 +520,7 @@ export default function SalesDemand() {
               </div>
               <div className="sdx-forecast-product">
                 <span className="sdx-forecast-product-name">Low stock coverage alerts</span>
-                <span className="sdx-forecast-product-value">{number(
-                  inventory.filter((item) => item.daysCoverage != null &&
-                    Number(item.daysCoverage) <= Number(item.leadTime || 7)).length
-                )}</span>
+                <span className="sdx-forecast-product-value">{number(lowCoverageProducts.length)}</span>
               </div>
             </div>
           </article>
