@@ -2,16 +2,18 @@ import express from 'express';
 import cors from 'cors';
 import connectDB from './db.js';
 import Inventory from './schemas/Inventory.js';
+import 'dotenv/config';
+import { config } from './config.js';
 
 const app = express();
 
-const PORT = 5000;
-const ML_API = 'http://localhost:8000';
+const PORT = config.port;
+const ML_API = config.mlApiUrl;
 
 // Connect to MongoDB
-connectDB();
+// Database connection is awaited before the HTTP server starts.
 
-app.use(cors());
+app.use(cors({ origin: config.clientOrigin.split(',').map((value) => value.trim()) }));
 app.use(express.json());
 
 
@@ -538,8 +540,13 @@ app.get('/api/health', async (req, res) => {
    Start Server
 -------------------------------------------------- */
 
-app.listen(PORT, () => {
-  console.log(
-    `StockPilot backend running on http://localhost:${PORT}`
-  );
-});
+connectDB()
+  .then(() => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`StockPilot API listening on port ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('StockPilot startup failed:', error.message);
+    process.exit(1);
+  });

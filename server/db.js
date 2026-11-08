@@ -1,14 +1,19 @@
 import mongoose from 'mongoose';
 
-const connectDB = async () => {
-  try {
-    await mongoose.connect('mongodb://127.0.0.1:27017/stockpilot');
-
-    console.log('MongoDB connected successfully');
-  } catch (error) {
-    console.error('MongoDB connection failed:', error.message);
-    process.exit(1);
+export async function connectDB() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    throw new Error('MONGODB_URI is required. Set it in the server environment.');
   }
-};
+
+  mongoose.set('strictQuery', true);
+  await mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 10000,
+    autoIndex: process.env.NODE_ENV !== 'production'
+  });
+
+  console.log('MongoDB connected');
+  return mongoose.connection;
+}
 
 export default connectDB;
