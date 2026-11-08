@@ -1,58 +1,14 @@
 import mongoose from 'mongoose';
 
-const inventorySchema = new mongoose.Schema(
-  {
-    productId: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true
-    },
+const inventorySchema = new mongoose.Schema({
+  productId: { type: String, required: true, unique: true, index: true },
+  currentStock: { type: Number, required: true, min: 0, default: 0 },
+  incomingStock: { type: Number, min: 0, default: 0 },
+  reservedStock: { type: Number, min: 0, default: 0 },
+  leadTimeDays: { type: Number, min: 0, default: 7 },
+  supplier: { type: String, trim: true, default: '' },
+  minimumOrderQty: { type: Number, min: 1, default: 1 },
+  unitCost: { type: Number, min: 0, default: 0 }
+}, { timestamps: true });
 
-    currentStock: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 0
-    },
-
-    incomingStock: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-
-    leadTimeDays: {
-      type: Number,
-      default: 7,
-      min: 0
-    },
-
-    supplier: {
-      type: String,
-      default: ''
-    },
-
-    minimumOrderQty: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-
-    unitCost: {
-      type: Number,
-      default: 0,
-      min: 0
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-const Inventory = mongoose.model(
-  'Inventory',
-  inventorySchema
-);
-
-export default Inventory;
+export default mongoose.models.Inventory || mongoose.model('Inventory', inventorySchema);

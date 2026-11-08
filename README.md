@@ -2,9 +2,9 @@
 
 **AI-powered demand forecasting and inventory decision support for retailers.**
 
-StockPilot is being developed as a deployable full-stack product, not a static dashboard. Its target workflow is to maintain a trustworthy inventory ledger, learn demand patterns from sales history, and turn forecasts into explainable replenishment decisions.
+StockPilot is a deployable full-stack inventory platform. Its core data flow starts with a persistent product catalogue, actual on-hand stock, auditable stock movements and recorded sales. Forecasts and replenishment recommendations are calculated from observed demand and supplier lead times.
 
-## Current architecture
+## Architecture
 
 - **Frontend:** React 18, Vite, React Router, Recharts
 - **Application API:** Node.js, Express
@@ -14,42 +14,39 @@ StockPilot is being developed as a deployable full-stack product, not a static d
 
 ## Local development
 
-### Prerequisites
-- Node.js 20 LTS or later
-- Python 3.10+
-- MongoDB 7+ (local or managed)
+Prerequisites: Node.js 20+, Python 3.10+, and MongoDB.
 
-### Configure the backend
-1. Copy `.env.example` to `.env` in the project root.
-2. Set `MONGODB_URI`, `ML_API_URL`, and `CLIENT_ORIGIN`.
-3. Install Node dependencies with `npm install`.
-4. Start the API with `npm run server`.
+1. Copy `.env.example` to `.env` and configure `MONGODB_URI`, `ML_API_URL`, and `CLIENT_ORIGIN`.
+2. Install Node dependencies with `npm install`.
+3. Start MongoDB.
+4. Start the API using `npm run server`.
+5. Start the frontend using `npm run dev`.
+6. Start the ML service after completing its data preparation and model training steps.
 
-### Start the frontend
-1. Run `npm install`.
-2. Run `npm run dev`.
-3. Open the Vite URL shown in the terminal.
+## Initial API
 
-### Start the ML service
-1. Create and activate a Python virtual environment.
-2. Install `ml/requirements.txt`.
-3. Prepare the source sales data and run the documented preprocessing and training scripts before starting the Flask service.
-4. Start the service with `python ml/app.py`.
+- `GET /api/health` — API, database and forecasting service status
+- `GET /api/products` — product catalogue
+- `POST /api/products` — create a product and opening stock
+- `GET /api/inventory` — real stock plus demand-based inventory indicators
+- `PUT /api/inventory/:productId` — audited manual stock adjustment
+- `POST /api/sales` — record a sale and deduct stock
+- `POST /api/purchases/receive` — receive stock and record a purchase movement
+- `GET /api/stock-movements` — movement ledger
+- `GET /api/sales` — sales aggregated by day
+- `GET /api/forecast` — model forecast (requires the ML service)
 
-> The ML service currently expects generated forecast and recommendation artifacts. A clean setup must generate those artifacts before the service starts. This is an active engineering task; do not treat sample CSV output as live business data.
+## Data integrity principles
 
-## Product principles
-
-1. Inventory on hand comes from persisted stock records and stock movements, never from sales-derived estimates.
-2. Sales and purchase receipts are auditable transactions.
-3. Forecasts are evaluated with chronological holdout data and compared with a simple baseline.
-4. Replenishment uses forecast demand, supplier lead time, service level, safety stock, and actual on-hand / on-order quantities.
-5. Every screen must consume the same documented API contract. No hidden hardcoded product-risk lists or fake forecast values.
+- On-hand stock is stored in MongoDB and is never inferred from historical sales.
+- Sales decrement stock and create sales and movement records.
+- Purchase receipts increment stock and create movement records.
+- Manual adjustments create an auditable movement with before/after balances.
+- When there is no sales history, demand-dependent risk and reorder values are reported as unknown rather than fabricated.
+- Current demand indicators are a transparent 28-day observed-sales baseline, not a trained ML forecast. Forecast accuracy claims will only be shown after chronological validation.
 
 ## Deployment
 
-The application is being prepared for separate frontend, API, database, and ML-service deployment. Use managed MongoDB, HTTPS, environment-injected secrets, restricted CORS origins, health checks, and persistent logs. Never put database credentials or signing secrets in frontend variables.
+Deploy the Vite frontend, Node API, and Python forecasting service separately. Use managed MongoDB, HTTPS, restricted CORS origins, and environment-injected secrets. Set the Vite API proxy appropriately for local development and configure the production frontend API base URL before deployment.
 
-## Engineering status
-
-This repository is under active development. Features should be described as production-ready only after automated tests, integration tests, data validation, and a live deployment smoke test pass.
+This project is under active development. Features should be called production-ready only after automated tests, integration tests, data validation, and a live deployment smoke test pass.
