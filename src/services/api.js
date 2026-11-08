@@ -235,6 +235,10 @@ export async function runWhatIf({
   };
 }
 
+export async function importHistoricalSales(rows) {
+  return request('/api/sales/import', { method: 'POST', body: JSON.stringify({ rows }) });
+}
+
 export async function getSales(range = 'daily', metric = 'revenue') {
   const days = range === 'weekly' || range === 'week' ? 7
     : range === 'monthly' || range === 'month' ? 30
