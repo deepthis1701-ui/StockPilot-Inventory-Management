@@ -28,7 +28,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-import { getInventory } from '../services/api.js';
+import { getInventory, updateInventory } from '../services/api.js';
+import InventoryActions from '../components/InventoryActions.jsx';
 import { PRODUCT_CATALOG } from '../data/productCatalog.js';
 
 import {
@@ -1966,15 +1967,17 @@ export default function Inventory() {
      LOAD INVENTORY
   ======================================================= */
 
+  const refreshInventory = async () => {
+    const refreshed = await getInventory();
+    setData(refreshed);
+    return refreshed;
+  };
+
   useEffect(() => {
-    getInventory()
-      .then(setData)
-      .catch((error) => {
-        console.error(
-          'Failed to load inventory:',
-          error
-        );
-      });
+    refreshInventory().catch((error) => {
+      console.error('Failed to load inventory:', error);
+      setData({ products: [], stats: { totalProducts: 0, critical: 0, attention: 0, healthy: 0, unknown: 0, recommendedUnits: 0, inventoryValue: 0 } });
+    });
   }, []);
 
 
@@ -1984,10 +1987,7 @@ export default function Inventory() {
 
   const products = useMemo(() => {
 
-    const baseProducts =
-      data?.products ||
-      PRODUCTS ||
-      [];
+    const baseProducts = Array.isArray(data?.products) ? data.products : [];
 
     return baseProducts.map(
       (product) => {
@@ -2465,58 +2465,12 @@ export default function Inventory() {
       Math.floor(stock);
 
     try {
-
-      const response =
-        await fetch(
-          `/api/inventory/${encodeURIComponent(
-            productId
-          )}`,
-          {
-            method: 'PUT',
-
-            headers: {
-              'Content-Type':
-                'application/json',
-            },
-
-            body: JSON.stringify({
-              currentStock:
-                updatedStock,
-            }),
-          }
-        );
-
-      const responseData =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          responseData.error ||
-            'Failed to update inventory'
-        );
-      }
-
-      const refreshed =
-        await getInventory();
-
-      setData(
-        refreshed
-      );
-
-      setSelectedProduct(
-        null
-      );
-
+      await updateInventory(productId, updatedStock);
+      await refreshInventory();
+      setSelectedProduct(null);
     } catch (error) {
-
-      console.error(
-        'Failed to update stock:',
-        error
-      );
-
-      alert(
-        'Unable to save stock. Please try again.'
-      );
+      console.error('Failed to update stock:', error);
+      alert(error.message || 'Unable to save stock. Please try again.');
     }
   }
 
@@ -2597,9 +2551,12 @@ export default function Inventory() {
 
           </div>
 
-          <div className="sp-header-meta">
-            <Package size={15} />
-            {stats.totalProducts} products tracked
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+            <div className="sp-header-meta">
+              <Package size={15} />
+              {stats.totalProducts} products tracked
+            </div>
+            <InventoryActions products={products} onComplete={refreshInventory} />
           </div>
 
         </div>
