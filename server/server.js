@@ -436,6 +436,61 @@ app.get('/api/sales', asyncRoute(async (req, res) => {
   });
 }));
 
+app.get('/api/sales/summary', asyncRoute(async (req, res) => {
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+  const rows = await SalesTransaction.aggregate([
+    { $match: { transactionDate: { $gte: start } } },
+    {
+      $group: {
+        _id: null,
+        totalRevenue: { $sum: '$totalAmount' },
+        totalUnits: { $sum: '$quantity' },
+        transactionCount: { $sum: 1 },
+        activeDays: { $addToSet: { $dateToString: { format: '%Y-%m-%d', date: '$transactionDate' } } }
+      }
+    }
+  ]);
+  const summary = rows[0] || { totalRevenue: 0, totalUnits: 0, transactionCount: 0, activeDays: [] };
+  res.json({
+    totalRevenue: Number(summary.totalRevenue || 0),
+    totalUnits: Number(summary.totalUnits || 0),
+    transactionCount: Number(summary.transactionCount || 0),
+    averageDailyUnits: Number((Number(summary.totalUnits || 0) / 30).toFixed(2)),
+    periodDays: 30
+  });
+}));
+
+app.get('/api/top-products', asyncRoute(async (req, res) => {
+  const start = new Date();
+  start.setDate(start.getDate() - 30);
+  const rows = await SalesTransaction.aggregate([
+    { $match: { transactionDate: { $gte: start } } },
+    {
+      $group: {
+        _id: '$productId',
+        name: { $first: '$productName' },
+        sku: { $first: '$sku' },
+        units: { $sum: '$quantity' },
+        revenue: { $sum: '$totalAmount' }
+      }
+    },
+    { $sort: { units: -1 } },
+    { $limit: 10 }
+  ]);
+  res.json({
+    count: rows.length,
+    products: rows.map((row) => ({
+      id: row._id,
+      productId: row._id,
+      name: row.name,
+      sku: row.sku,
+      units: Number(row.units || 0),
+      revenue: Number(row.revenue || 0)
+    }))
+  });
+}));
+
 app.get('/api/dashboard', asyncRoute(async (req, res) => {
   const [snapshot, sales] = await Promise.all([
     createInventorySnapshot(),
