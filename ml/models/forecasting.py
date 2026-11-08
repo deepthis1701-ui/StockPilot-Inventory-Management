@@ -167,6 +167,27 @@ def _build_validation_data(series: list[dict[str, Any]]):
     )
 
 
+def _build_full_training_data(series: list[dict[str, Any]]):
+    """Create all supervised rows available after model selection.
+
+    Every feature vector uses only observations preceding its target day. This
+    lets the selected model be refitted on the complete known history after
+    validation, without including any unknown future target values.
+    """
+    train_x, train_y = [], []
+
+    for item in series:
+        values = item["values"]
+        count = len(values)
+
+        for index in range(28, count):
+            target_day = item["last_date"] - timedelta(days=count - 1 - index)
+            train_x.append(_make_features(values[:index], target_day))
+            train_y.append(float(values[index]))
+
+    return np.asarray(train_x, dtype=float), np.asarray(train_y, dtype=float)
+
+
 def _recursive_forecast(
     history: list[float],
     start_date: date,
@@ -289,11 +310,24 @@ def generate_forecasts(
             and baseline_wape is not None
             and ml_wape < baseline_wape * 0.98
         ):
-            model = candidate
+            # The candidate above is used only to score the holdout. Once
+            # selected, refit a fresh model on every known supervised row,
+            # including the just-completed internal validation window.
+            final_x, final_y = _build_full_training_data(eligible)
+            model = HistGradientBoostingRegressor(
+                learning_rate=0.06,
+                max_iter=160,
+                max_leaf_nodes=15,
+                l2_regularization=1.5,
+                min_samples_leaf=12,
+                random_state=42,
+            )
+            model.fit(final_x, final_y)
             selected_model = "hist_gradient_boosting"
             selection_reason = (
                 "The pooled ML model improved WAPE by more than 2% versus "
-                "the seasonal-naive baseline on a recursive 14-day holdout."
+                "the seasonal-naive baseline on a recursive 14-day holdout, "
+                "then was refitted on all known training history."
             )
         else:
             selection_reason = (
