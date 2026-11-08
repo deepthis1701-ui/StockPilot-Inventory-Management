@@ -21,9 +21,7 @@ import {
   RefreshCw,
   ShoppingBag,
   Sparkles,
-  TrendingUp,
   UploadCloud,
-  X
 } from 'lucide-react';
 import {
   getSales,
@@ -48,7 +46,7 @@ const number = (value, digits = 0) => Number(value || 0).toLocaleString('en-IN',
 const getDayKey = (value) => {
   if (!value) return '';
   const raw = String(value);
-  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(raw)) return raw;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
 };
@@ -208,11 +206,6 @@ export default function SalesDemand() {
     const demand = item.predictedDailyDemand ?? item.predicted_daily_demand;
     return demand !== null && demand !== undefined && Number(demand) > 0;
   });
-  const lowCoverageProducts = demandProducts.filter((item) =>
-    item.daysCoverage != null &&
-    Number(item.daysCoverage) <= Number(item.leadTime || 7)
-  );
-
   const handleImport = async () => {
     if (!selectedFile) return;
 
@@ -224,8 +217,8 @@ export default function SalesDemand() {
         throw new Error('Please choose a .csv file.');
       }
 
-      const csvText = (await selectedFile.text()).replace(/^\\uFEFF/, '');
-      const lines = csvText.split(/\\r?\\n/).filter((line) => line.trim());
+      const csvText = (await selectedFile.text()).replace(/^\uFEFF/, '');
+      const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
 
       if (lines.length < 2) {
         throw new Error('Your CSV needs a header row and at least one sales row.');
@@ -236,7 +229,7 @@ export default function SalesDemand() {
       }
 
       const headers = parseCsvLine(lines[0]).map((header) =>
-        header.toLowerCase().replace(/[\\s-]+/g, '_')
+        header.toLowerCase().replace(/[\s-]+/g, '_')
       );
       const dateKey = headers.includes('date') ? 'date' : 'transaction_date';
 
@@ -289,7 +282,7 @@ export default function SalesDemand() {
   };
 
   const downloadTemplate = () => {
-    const csv = 'date,sku,quantity,unit_price,channel,reference\\n';
+    const csv = 'date,sku,quantity,unit_price,channel,reference\n';
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
