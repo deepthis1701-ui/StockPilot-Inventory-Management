@@ -38,3 +38,12 @@ ml/models/*.joblib
 
 # Large ML dataset
 ml/data/sales_train_validation.csv
+
+# Local virtual environment
+ml/.venv/
+
+# Public benchmark source data (download locally, do not commit)
+ml/data/Online Retail.xlsx
+
+# Local benchmark outputs
+ml/benchmark_results/
