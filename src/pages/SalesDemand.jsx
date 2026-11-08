@@ -1,2062 +1,673 @@
-import { useEffect, useMemo, useState } from 'react';
-
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
+  Area,
+  AreaChart,
   CartesianGrid,
-  Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
+  Tooltip,
+  XAxis,
+  YAxis
 } from 'recharts';
-
 import {
+  Activity,
+  AlertCircle,
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  FileSpreadsheet,
   IndianRupee,
   Package,
-  TrendingUp,
-  AlertTriangle,
-  ArrowUpRight,
   RefreshCw,
-  ShoppingCart,
-  CalendarDays,
-  ChevronRight,
-  CheckCircle2,
-  Upload,
-  FileSpreadsheet,
+  ShoppingBag,
+  Sparkles,
+  TrendingUp,
+  UploadCloud,
+  X
 } from 'lucide-react';
-
 import {
   getSales,
   getSalesDemandStats,
-  importHistoricalSales,
+  getTopProducts,
+  getInventory,
+  getForecast,
+  importHistoricalSales
 } from '../services/api.js';
+import './SalesDemand.css';
 
-/* =========================================================
-   LIVE BUSINESS DATA
-========================================================= */
+const money = (value) => new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 0
+}).format(Number(value || 0));
 
-const topProducts = [];
-const attentionProducts = [];
-const upcomingDemand = [];
-const fallbackSalesData = [];
-const fallbackCategoryData = [];
+const number = (value, digits = 0) => Number(value || 0).toLocaleString('en-IN', {
+  maximumFractionDigits: digits
+});
 
+const getDayKey = (value) => {
+  if (!value) return '';
+  const raw = String(value);
+  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(raw)) return raw;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+};
 
-/* =========================================================
-   HELPERS
-========================================================= */
+function parseCsvLine(line) {
+  const cells = [];
+  let value = '';
+  let quoted = false;
 
-function formatCurrency(value) {
-  return `₹${Number(value || 0).toLocaleString('en-IN')}`;
-}
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
 
-function normalizeSalesData(response) {
-  const raw =
-    response?.data ||
-    response?.sales ||
-    response?.trend ||
-    [];
-
-  if (!Array.isArray(raw) || raw.length === 0) {
-    return [];
+    if (char === '"' && quoted && line[i + 1] === '"') {
+      value += '"';
+      i += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      cells.push(value.trim());
+      value = '';
+    } else {
+      value += char;
+    }
   }
 
-  return raw.map((item, index) => ({
-    date:
-      item.date ||
-      item.label ||
-      item.day ||
-      `Day ${index + 1}`,
-
-    value: Number(
-      item.value ??
-      item.sales ??
-      item.revenue ??
-      item.amount ??
-      0
-    ),
-  }));
-}
-
-function normalizeCategoryData(response) {
-  const raw =
-    response?.data ||
-    response?.categories ||
-    [];
-
-  if (!Array.isArray(raw) || raw.length === 0) {
-    return [];
+  if (quoted) {
+    throw new Error('A CSV row contains an unmatched quotation mark.');
   }
 
-  const result = raw
-    .map((item) => ({
-      category:
-        item.category ||
-        item.name ||
-        item.label ||
-        'Other',
-
-      sales: Number(
-        item.sales ??
-        item.revenue ??
-        item.value ??
-        0
-      ),
-    }))
-    .filter((item) => item.sales > 0);
-
-  return result;
+  cells.push(value.trim());
+  return cells;
 }
 
+function SalesTooltip({ active, payload, label, metric }) {
+  if (!active || !payload?.length) return null;
 
-/* =========================================================
-   STAT CARD
-========================================================= */
-
-function StatCard({
-  icon,
-  title,
-  value,
-  subtitle,
-  trend,
-  trendLabel,
-}) {
   return (
-    <div className="sp-stat-card">
-      <div className="sp-stat-top">
-        <div className="sp-stat-icon">
-          {icon}
-        </div>
-
-        {trend !== undefined && (
-          <div className="sp-stat-trend">
-            <ArrowUpRight size={15} />
-            {trend}%
-          </div>
-        )}
+    <div className="sdx-tooltip">
+      <div className="sdx-tooltip-date">
+        {new Date(label).toLocaleDateString('en-IN', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short'
+        })}
       </div>
-
-      <div className="sp-stat-title">
-        {title}
+      <div className="sdx-tooltip-value">
+        {metric === 'revenue'
+          ? money(payload[0].value)
+          : `${number(payload[0].value)} units`}
       </div>
-
-      <div className="sp-stat-value">
-        {value}
-      </div>
-
-      <div className="sp-stat-subtitle">
-        {subtitle}
-      </div>
-
-      {trendLabel && (
-        <div className="sp-stat-trend-label">
-          {trendLabel}
-        </div>
-      )}
     </div>
   );
 }
 
-
-/* =========================================================
-   MAIN PAGE
-========================================================= */
+function MetricCard({ icon: Icon, tone, label, value, note }) {
+  return (
+    <article className="sdx-metric-card">
+      <div className="sdx-metric-top">
+        <div className={`sdx-metric-icon ${tone}`}>
+          <Icon size={18} />
+        </div>
+      </div>
+      <div className="sdx-metric-label">{label}</div>
+      <div className="sdx-metric-value">{value}</div>
+      <div className="sdx-metric-note">{note}</div>
+    </article>
+  );
+}
 
 export default function SalesDemand() {
-  const [salesData, setSalesData] = useState(
-    fallbackSalesData
-  );
-
-  const [categoryData, setCategoryData] = useState(
-    fallbackCategoryData
-  );
-
-  const [stats, setStats] = useState({
-    totalSales: 0,
-    unitsSold: 0,
-    averageDailyDemand: 0,
-    salesGrowth: 0,
-  });
-
   const [range, setRange] = useState('daily');
   const [metric, setMetric] = useState('revenue');
-
-  const [loading, setLoading] = useState(false);
+  const [salesRows, setSalesRows] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [topProducts, setTopProducts] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [forecast, setForecast] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [pageError, setPageError] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [importBusy, setImportBusy] = useState(false);
-  const [importMessage, setImportMessage] = useState('');
-  const [importError, setImportError] = useState('');
+  const [feedback, setFeedback] = useState(null);
+  const fileRef = useRef(null);
 
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setPageError('');
 
-  /* =====================================================
-     LOAD SALES DATA
-  ===================================================== */
+    const results = await Promise.allSettled([
+      getSales(range, metric),
+      getSalesDemandStats(),
+      getTopProducts(),
+      getInventory(),
+      getForecast('All Products', 14)
+    ]);
 
-  const loadSalesData = async () => {
-    try {
-      setLoading(true);
+    const [salesResult, statsResult, productsResult, inventoryResult, forecastResult] = results;
 
-      const [salesResponse, statsResponse] =
-        await Promise.all([
-          getSales(range, metric),
-          getSalesDemandStats(),
-        ]);
-
-      setSalesData(
-        normalizeSalesData(salesResponse)
-      );
-
-      if (statsResponse) {
-        setStats({
-          totalSales:
-            Number(
-              statsResponse.totalSales ??
-              statsResponse.total_sales ??
-              statsResponse.revenue ??
-              0
-            ),
-
-          unitsSold:
-            Number(
-              statsResponse.unitsSold ??
-              statsResponse.units_sold ??
-              0
-            ),
-
-          averageDailyDemand:
-            Number(
-              statsResponse.averageDailyDemand ??
-              statsResponse.average_daily_demand ??
-              0
-            ),
-
-          salesGrowth:
-            Number(
-              statsResponse.salesGrowth ??
-              statsResponse.sales_growth ??
-              0
-            ),
-        });
-      }
-    } catch (error) {
-      console.error(
-        'Unable to load sales data:',
-        error
-      );
-
-      setSalesData(fallbackSalesData);
-    } finally {
-      setLoading(false);
+    if (salesResult.status === 'fulfilled') {
+      const raw = salesResult.value?.data || salesResult.value?.sales || [];
+      setSalesRows(Array.isArray(raw) ? raw : []);
+    } else {
+      setSalesRows([]);
+      setPageError('The sales trend could not be loaded. Check that the backend is running.');
     }
-  };
 
-
-  useEffect(() => {
-    loadSalesData();
+    setStats(statsResult.status === 'fulfilled' ? statsResult.value : null);
+    setTopProducts(productsResult.status === 'fulfilled'
+      ? (productsResult.value?.products || productsResult.value?.data || [])
+      : []);
+    setInventory(inventoryResult.status === 'fulfilled'
+      ? (inventoryResult.value?.products || [])
+      : []);
+    setForecast(forecastResult.status === 'fulfilled' ? forecastResult.value : null);
+    setLoading(false);
   }, [range, metric]);
 
-
-  /* =====================================================
-     CATEGORY DATA
-  ===================================================== */
-
   useEffect(() => {
-    setCategoryData([]);
-  }, []);
+    loadData();
+  }, [loadData]);
 
-
-  /* =====================================================
-     TOTAL CATEGORY SALES
-  ===================================================== */
-
-  const categoryTotal = useMemo(() => {
-    return categoryData.reduce(
-      (sum, item) => sum + Number(item.sales || 0),
-      0
+  const chartData = useMemo(() => {
+    const days = range === 'weekly' ? 7 : range === 'quarterly' ? 90 : 30;
+    const keyed = new Map(
+      salesRows.map((row) => {
+        const day = getDayKey(row.date || row.label || row.day);
+        return [day, Number(row.value ?? row[metric] ?? 0)];
+      }).filter(([day]) => day)
     );
-  }, [categoryData]);
 
+    const now = new Date();
+    const todayUtc = new Date(Date.UTC(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ));
+    const points = [];
 
-  /* =====================================================
-     TOOLTIP
-  ===================================================== */
-
-  const SalesTooltip = ({
-    active,
-    payload,
-    label,
-  }) => {
-    if (
-      !active ||
-      !payload ||
-      payload.length === 0
-    ) {
-      return null;
+    for (let offset = days - 1; offset >= 0; offset -= 1) {
+      const date = new Date(todayUtc);
+      date.setUTCDate(todayUtc.getUTCDate() - offset);
+      const day = date.toISOString().slice(0, 10);
+      points.push({ date: day, value: keyed.get(day) || 0 });
     }
 
-    return (
-      <div className="sp-tooltip">
-        <div className="sp-tooltip-label">
-          {label}
-        </div>
+    return points;
+  }, [salesRows, range, metric]);
 
-        <div className="sp-tooltip-value">
-          {metric === 'revenue'
-            ? formatCurrency(payload[0].value)
-            : `${Number(
-                payload[0].value || 0
-              ).toLocaleString('en-IN')} units`}
-        </div>
-      </div>
-    );
+  const forecastItems = forecast?.forecasts || [];
+  const readyForecasts = forecastItems.filter((item) =>
+    item.forecast_status === 'available' || item.predicted_daily_demand != null
+  );
+  const historyNeeded = forecastItems.filter((item) =>
+    item.forecast_status === 'insufficient_history'
+  ).length;
+  const demandProducts = inventory.filter((item) => {
+    const demand = item.predictedDailyDemand ?? item.predicted_daily_demand;
+    return demand !== null && demand !== undefined && Number(demand) > 0;
+  });
+  const lowCoverageProducts = demandProducts.filter((item) =>
+    item.daysCoverage != null &&
+    Number(item.daysCoverage) <= Number(item.leadTime || 7)
+  );
+
+  const handleImport = async () => {
+    if (!selectedFile) return;
+
+    setImportBusy(true);
+    setFeedback(null);
+
+    try {
+      if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
+        throw new Error('Please choose a .csv file.');
+      }
+
+      const csvText = (await selectedFile.text()).replace(/^\\uFEFF/, '');
+      const lines = csvText.split(/\\r?\\n/).filter((line) => line.trim());
+
+      if (lines.length < 2) {
+        throw new Error('Your CSV needs a header row and at least one sales row.');
+      }
+
+      if (lines.length - 1 > 5000) {
+        throw new Error('A single import can contain up to 5,000 rows.');
+      }
+
+      const headers = parseCsvLine(lines[0]).map((header) =>
+        header.toLowerCase().replace(/[\\s-]+/g, '_')
+      );
+      const dateKey = headers.includes('date') ? 'date' : 'transaction_date';
+
+      for (const required of [dateKey, 'sku', 'quantity']) {
+        if (!headers.includes(required)) {
+          throw new Error(`Missing required column: ${required}`);
+        }
+      }
+
+      const rows = lines.slice(1).map((line, index) => {
+        const values = parseCsvLine(line);
+
+        if (values.length > headers.length) {
+          throw new Error(`Row ${index + 2} has more values than the header.`);
+        }
+
+        const record = Object.fromEntries(
+          headers.map((header, valueIndex) => [header, values[valueIndex] ?? ''])
+        );
+
+        return {
+          date: record.date || record.transaction_date,
+          sku: record.sku,
+          quantity: record.quantity,
+          unitPrice: record.unit_price || record.unitprice || record.price || undefined,
+          channel: record.channel || 'counter',
+          reference: record.reference || ''
+        };
+      });
+
+      const result = await importHistoricalSales(rows);
+
+      setFeedback({
+        type: 'success',
+        message: `${number(result.importedRows)} historical sales row(s) imported. Current stock was not changed.`
+      });
+      setSelectedFile(null);
+
+      if (fileRef.current) fileRef.current.value = '';
+
+      await loadData();
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error.message || 'Unable to import this CSV file.'
+      });
+    } finally {
+      setImportBusy(false);
+    }
   };
 
+  const downloadTemplate = () => {
+    const csv = 'date,sku,quantity,unit_price,channel,reference\\n';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = 'stockpilot-sales-template.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const rangeLabel = range === 'weekly' ? 'Last 7 days'
+    : range === 'quarterly' ? 'Last 90 days'
+      : 'Last 30 days';
 
   return (
-    <div className="sp-page">
-
-      {/* =================================================
-          PAGE HEADER
-      ================================================= */}
-
-      <div className="sp-page-header">
-
+    <main className="sdx-page">
+      <header className="sdx-header">
         <div>
-          <div className="sp-eyebrow">
-            BUSINESS INTELLIGENCE
-          </div>
-
-          <h1>
-            Sales & Demand
-          </h1>
-
-          <p>
-            Understand what customers are buying,
-            what needs attention, and what demand
-            is coming next.
+          <div className="sdx-eyebrow">STORE PERFORMANCE</div>
+          <h1 className="sdx-title">Sales &amp; Demand</h1>
+          <p className="sdx-subtitle">
+            A clear view of store sales, product movement and forecast readiness.
           </p>
         </div>
 
-        <button
-          className="sp-refresh-btn"
-          onClick={loadSalesData}
-          disabled={loading}
-        >
-          <RefreshCw
-            size={16}
-            className={
-              loading
-                ? 'sp-spin'
-                : ''
-            }
-          />
-
-          {loading
-            ? 'Refreshing...'
-            : 'Refresh data'}
-        </button>
-
-      </div>
-
-
-      <section className="sp-card" style={{ marginBottom: 24 }}>
-        <div className="sp-card-header">
-          <div><div className="sp-section-kicker">HISTORICAL DATA</div><h2>Import sales history</h2>
-            <p>Upload a CSV exported from your billing or POS system. Historical imports enrich reports and forecasts without changing current stock.</p></div>
-          <FileSpreadsheet size={28} />
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-          <input type="file" accept=".csv,text/csv" onChange={(event) => { setSelectedFile(event.target.files?.[0] || null); setImportMessage(''); setImportError(''); }} />
-          <button className="sp-refresh-btn" disabled={!selectedFile || importBusy} onClick={async () => {
-            setImportBusy(true); setImportMessage(''); setImportError('');
-            try {
-              const csvText = (await selectedFile.text()).replace(/^\uFEFF/, '');
-              const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
-              if (lines.length < 2) throw new Error('CSV must contain a header and at least one data row.');
-              const parseLine = (line) => { const cells = []; let value = ''; let quoted = false; for (let i = 0; i < line.length; i += 1) { const char = line[i]; if (char === '"' && quoted && line[i + 1] === '"') { value += '"'; i += 1; } else if (char === '"') quoted = !quoted; else if (char === ',' && !quoted) { cells.push(value.trim()); value = ''; } else value += char; } cells.push(value.trim()); return cells; };
-              const headers = parseLine(lines[0]).map((value) => value.toLowerCase().replace(/[\s-]+/g, '_'));
-              const dateKey = headers.includes('date') ? 'date' : 'transaction_date';
-              for (const required of [dateKey, 'sku', 'quantity']) if (!headers.includes(required)) throw new Error('Missing required CSV column: ' + required);
-              const rows = lines.slice(1).map((line) => { const values = parseLine(line); const record = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ''])); return { date: record.date || record.transaction_date, sku: record.sku, quantity: record.quantity, unitPrice: record.unit_price || record.unitprice || record.price || undefined, channel: record.channel || 'counter', reference: record.reference || '' }; });
-              const result = await importHistoricalSales(rows);
-              setImportMessage(String(result.importedRows) + ' historical sales rows imported. Current stock was not changed.'); setSelectedFile(null); await loadSalesData();
-            } catch (error) { setImportError(error.message || 'Unable to import this CSV file.'); } finally { setImportBusy(false); }
-          }}> <Upload size={16} style={{ marginRight: 8 }} />{importBusy ? 'Importing...' : 'Import CSV'}</button>
-        </div>
-        <p style={{ fontSize: 12, color: '#64748b' }}>Required columns: date, sku, quantity. Optional: unit_price (or price), channel, reference. Dates must be within the last 730 days. Maximum 5,000 rows per import.</p>
-        {importMessage && <p style={{ color: '#15803d', fontWeight: 600 }}>{importMessage}</p>}
-        {importError && <p style={{ color: '#b91c1c', fontWeight: 600 }}>{importError}</p>}
-        <button type="button" onClick={() => { const csv = 'date,sku,quantity,unit_price,channel,reference\n2026-10-01,RICE-001,5,80,counter,POS-1001\n'; const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'stockpilot-sales-template.csv'; link.click(); URL.revokeObjectURL(url); }} style={{ border: 0, background: 'transparent', color: '#5268d8', cursor: 'pointer', padding: 0 }}>Download sample CSV template</button>
-      </section>
-      {/* =================================================
-          BUSINESS SUMMARY
-      ================================================= */}
-
-      <section className="sp-section">
-
-        <div className="sp-section-heading">
-          <div>
-            <div className="sp-section-kicker">
-              BUSINESS SUMMARY
-            </div>
-
-            <h2>
-              How the store is performing
-            </h2>
+        <div className="sdx-header-actions">
+          <div className="sdx-date-chip">
+            <CalendarDays size={14} />
+            {rangeLabel}
           </div>
+          <button
+            type="button"
+            className="sdx-button sdx-button-ghost"
+            onClick={loadData}
+            disabled={loading}
+          >
+            <RefreshCw size={14} className={loading ? 'sdx-spin' : ''} />
+            {loading ? 'Refreshing' : 'Refresh'}
+          </button>
         </div>
+      </header>
 
-
-        <div className="sp-stats-grid">
-
-          <StatCard
-            icon={<IndianRupee size={20} />}
-            title="Total Sales"
-            value={formatCurrency(
-              stats.totalSales
-            )}
-            subtitle="Revenue · Last 30 days"
-            trend={stats.salesGrowth}
-            trendLabel="Growing"
-          />
-
-          <StatCard
-            icon={<ShoppingCart size={20} />}
-            title="Units Sold"
-            value={Number(
-              stats.unitsSold || 0
-            ).toLocaleString('en-IN')}
-            subtitle="Units · Last 30 days"
-          />
-
-          <StatCard
-            icon={<Package size={20} />}
-            title="Average Daily Demand"
-            value={Number(
-              stats.averageDailyDemand || 0
-            ).toLocaleString('en-IN')}
-            subtitle="Units expected per day"
-          />
-
-          <StatCard
-            icon={<TrendingUp size={20} />}
-            title="Sales Growth"
-            value={`+${Number(
-              stats.salesGrowth || 0
-            ).toFixed(1)}%`}
-            subtitle="Compared with previous period"
-            trend={stats.salesGrowth}
-          />
-
+      {pageError && (
+        <div className="sdx-error-banner">
+          <AlertCircle size={15} />
+          {pageError}
         </div>
+      )}
 
+      <section className="sdx-metrics" aria-label="Sales summary">
+        <MetricCard
+          icon={IndianRupee}
+          tone="blue"
+          label="Revenue"
+          value={stats ? money(stats.totalSales) : '—'}
+          note="Recorded in the last 30 days"
+        />
+        <MetricCard
+          icon={ShoppingBag}
+          tone="violet"
+          label="Units sold"
+          value={stats ? number(stats.unitsSold) : '—'}
+          note="Total quantity sold"
+        />
+        <MetricCard
+          icon={Activity}
+          tone="cyan"
+          label="Average daily sales"
+          value={stats ? number(stats.averageDailyDemand, 2) : '—'}
+          note="Units per day · 30-day average"
+        />
+        <MetricCard
+          icon={FileSpreadsheet}
+          tone="amber"
+          label="Transactions"
+          value={stats ? number(stats.transactionCount) : '—'}
+          note="Recorded bills and sales entries"
+        />
       </section>
 
-
-      {/* =================================================
-          SALES PERFORMANCE
-      ================================================= */}
-
-      <section className="sp-card sp-sales-card">
-
-        <div className="sp-card-header">
-
-          <div>
-            <div className="sp-section-kicker">
-              SALES PERFORMANCE
+      <section className="sdx-main-grid">
+        <article className="sdx-card">
+          <div className="sdx-card-header">
+            <div>
+              <div className="sdx-card-kicker">SALES ACTIVITY</div>
+              <h2 className="sdx-card-title">Sales trend</h2>
+              <p className="sdx-card-description">
+                Daily sales recorded by StockPilot for the selected period.
+              </p>
             </div>
 
-            <h2>
-              Sales trend
-            </h2>
-
-            <p>
-              Track how sales are changing over time.
-            </p>
-          </div>
-
-
-          <div className="sp-control-group">
-
-            <div className="sp-toggle">
-              {[
-                ['daily', 'Daily'],
-                ['weekly', 'Weekly'],
-                ['monthly', 'Monthly'],
-              ].map(([value, label]) => (
+            <div className="sdx-chart-tools">
+              <div className="sdx-segment" aria-label="Date range">
+                {[
+                  ['weekly', '7D'],
+                  ['daily', '30D'],
+                  ['quarterly', '90D']
+                ].map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    className={range === value ? 'active' : ''}
+                    onClick={() => setRange(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="sdx-segment" aria-label="Sales metric">
                 <button
-                  key={value}
-                  className={
-                    range === value
-                      ? 'active'
-                      : ''
-                  }
-                  onClick={() =>
-                    setRange(value)
-                  }
+                  type="button"
+                  className={metric === 'revenue' ? 'active' : ''}
+                  onClick={() => setMetric('revenue')}
                 >
-                  {label}
+                  Revenue
                 </button>
+                <button
+                  type="button"
+                  className={metric === 'units' ? 'active' : ''}
+                  onClick={() => setMetric('units')}
+                >
+                  Units
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="sdx-chart-empty">
+              <div className="sdx-empty-icon"><BarChart3 size={20} /></div>
+              <div className="sdx-empty-title">Loading sales activity</div>
+              <div className="sdx-empty-copy">Fetching the latest transaction history.</div>
+            </div>
+          ) : chartData.some((item) => item.value > 0) ? (
+            <div className="sdx-chart-wrap">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 12, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="sdxSalesFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#4778df" stopOpacity={0.22} />
+                      <stop offset="95%" stopColor="#4778df" stopOpacity={0.015} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="#edf1f6" strokeDasharray="3 5" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={28}
+                    tick={{ fill: '#9aa5b5', fontSize: 10 }}
+                    tickFormatter={(value) => new Date(value).toLocaleDateString('en-IN', {
+                      day: 'numeric', month: 'short'
+                    })}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    width={metric === 'revenue' ? 58 : 38}
+                    tick={{ fill: '#9aa5b5', fontSize: 10 }}
+                    tickFormatter={(value) => metric === 'revenue'
+                      ? `₹${number(value)}`
+                      : number(value)}
+                  />
+                  <Tooltip content={<SalesTooltip metric={metric} />} />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#4778df"
+                    strokeWidth={2.5}
+                    fill="url(#sdxSalesFill)"
+                    activeDot={{ r: 5, strokeWidth: 0, fill: '#315fca' }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="sdx-chart-empty">
+              <div className="sdx-empty-icon"><BarChart3 size={20} /></div>
+              <div className="sdx-empty-title">No sales in this period yet</div>
+              <div className="sdx-empty-copy">
+                Sales entered manually or imported from your POS will appear here. The chart does not use sample values.
+              </div>
+            </div>
+          )}
+        </article>
+
+        <div className="sdx-side-stack">
+          <article className="sdx-forecast-card">
+            <div className="sdx-forecast-heading">
+              <div className="sdx-forecast-icon"><Sparkles size={18} /></div>
+              <span className={readyForecasts.length > 0 ? 'sdx-status ready' : 'sdx-status waiting'}>
+                {readyForecasts.length > 0 ? 'Forecast available' : 'Building history'}
+              </span>
+            </div>
+            <div className="sdx-card-kicker" style={{ marginTop: 15 }}>DEMAND FORECAST</div>
+            <h2 className="sdx-card-title">Forecast readiness</h2>
+
+            {readyForecasts.length > 0 ? (
+              <>
+                <p className="sdx-forecast-copy">
+                  {readyForecasts.length} product forecast(s) are available from the current sales history.
+                </p>
+                <div className="sdx-forecast-products">
+                  {readyForecasts.slice(0, 3).map((item) => (
+                    <div className="sdx-forecast-product" key={item.id || item.product_id || item.sku}>
+                      <span className="sdx-forecast-product-name">
+                        {item.product_name || item.name || item.sku || 'Product'}
+                      </span>
+                      <span className="sdx-forecast-product-value">
+                        {number(item.predicted_daily_demand, 2)} / day
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="sdx-forecast-copy">
+                {historyNeeded > 0
+                  ? `${historyNeeded} product(s) need more history before a reliable forecast can be produced. The current engine requires at least 56 tracked days and 7 days with sales per product.`
+                  : 'Forecasts will appear here when enough dated sales history is available for your products. No demand estimate is being invented.'}
+              </p>
+            )}
+            <div className="sdx-forecast-products">
+              <div className="sdx-forecast-product">
+                <span className="sdx-forecast-product-name">Products with sales history</span>
+                <span className="sdx-forecast-product-value">{number(forecastItems.length)}</span>
+              </div>
+              <div className="sdx-forecast-product">
+                <span className="sdx-forecast-product-name">Forecasts available</span>
+                <span className="sdx-forecast-product-value">{number(readyForecasts.length)}</span>
+              </div>
+              <div className="sdx-forecast-product">
+                <span className="sdx-forecast-product-name">Low stock coverage alerts</span>
+                <span className="sdx-forecast-product-value">{number(
+                  inventory.filter((item) => item.daysCoverage != null &&
+                    Number(item.daysCoverage) <= Number(item.leadTime || 7)).length
+                )}</span>
+              </div>
+            </div>
+          </article>
+
+          <article className="sdx-card">
+            <div className="sdx-card-header" style={{ marginBottom: 8 }}>
+              <div>
+                <div className="sdx-card-kicker">INVENTORY SIGNAL</div>
+                <h2 className="sdx-card-title">Stock coverage</h2>
+              </div>
+              <Package size={18} color="#7790b5" />
+            </div>
+            <p className="sdx-forecast-copy" style={{ marginTop: 0 }}>
+              {lowCoverageProducts.length > 0
+                ? `${lowCoverageProducts.length} product(s) with recorded demand have stock coverage at or below their lead time. Review Risk Analysis for details.`
+                : demandProducts.length > 0
+                  ? 'No products with recorded demand are currently below their lead-time coverage.'
+                  : 'Stock coverage alerts will become meaningful after products have enough sales history to estimate daily demand.'}
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section className="sdx-bottom-grid">
+        <article className="sdx-card">
+          <div className="sdx-card-header">
+            <div>
+              <div className="sdx-card-kicker">PRODUCT PERFORMANCE</div>
+              <h2 className="sdx-card-title">Top-selling products</h2>
+              <p className="sdx-card-description">Ranked by units sold over the last 30 days.</p>
+            </div>
+            <span className="sdx-status">{number(topProducts.length)} products</span>
+          </div>
+
+          {topProducts.length > 0 ? (
+            <div className="sdx-product-list">
+              {topProducts.slice(0, 6).map((product, index) => (
+                <div className="sdx-product-row" key={product.id || product.productId || product.sku || index}>
+                  <div className="sdx-product-rank">{index + 1}</div>
+                  <div>
+                    <div className="sdx-product-name">{product.name || product.productName || 'Unnamed product'}</div>
+                    <div className="sdx-product-sku">{product.sku || 'SKU not available'}</div>
+                  </div>
+                  <div className="sdx-product-number">
+                    <span>Units</span>
+                    {number(product.units)}
+                  </div>
+                  <div className="sdx-product-number">
+                    <span>Revenue</span>
+                    {money(product.revenue)}
+                  </div>
+                </div>
               ))}
             </div>
-
-
-            <div className="sp-toggle">
-              <button
-                className={
-                  metric === 'revenue'
-                    ? 'active'
-                    : ''
-                }
-                onClick={() =>
-                  setMetric('revenue')
-                }
-              >
-                Revenue
-              </button>
-
-              <button
-                className={
-                  metric === 'units'
-                    ? 'active'
-                    : ''
-                }
-                onClick={() =>
-                  setMetric('units')
-                }
-              >
-                Units
-              </button>
+          ) : (
+            <div className="sdx-empty-inline">
+              <Clock3 size={17} />
+              <span>
+                No product has sales in the last 30 days yet. Record a sale or import genuine historical POS data to populate this ranking.
+              </span>
             </div>
-
-          </div>
-
-        </div>
-
-
-        <div className="sp-chart-wrap">
-          <ResponsiveContainer
-            width="100%"
-            height={330}
-          >
-            <LineChart
-              data={salesData}
-              margin={{
-                top: 10,
-                right: 15,
-                left: 5,
-                bottom: 5,
-              }}
-            >
-
-              <CartesianGrid
-                strokeDasharray="3 3"
-                vertical={false}
-              />
-
-              <XAxis
-                dataKey="date"
-                tickLine={false}
-                axisLine={false}
-              />
-
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) =>
-                  metric === 'revenue'
-                    ? `₹${Math.round(
-                        value / 1000
-                      )}k`
-                    : value
-                }
-              />
-
-              <Tooltip
-                content={<SalesTooltip />}
-              />
-
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="currentColor"
-                strokeWidth={3}
-                dot={{
-                  r: 3,
-                }}
-                activeDot={{
-                  r: 6,
-                }}
-              />
-
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-      </section>
-
-
-      {/* =================================================
-          TOP PRODUCTS
-      ================================================= */}
-
-      <section className="sp-card">
-
-        <div className="sp-card-header">
-
-          <div>
-            <div className="sp-section-kicker">
-              TOP-SELLING PRODUCTS
-            </div>
-
-            <h2>
-              What customers are buying
-            </h2>
-
-            <p>
-              Products generating the strongest
-              sales volume and revenue.
-            </p>
-          </div>
-
-          <div className="sp-header-badge">
-            Last 30 days
-          </div>
-
-        </div>
-
-
-        <div className="sp-product-list">
-
-          {topProducts.map(
-            (product, index) => (
-              <div
-                className="sp-product-row"
-                key={product.name}
-              >
-
-                <div className="sp-rank">
-                  {index + 1}
-                </div>
-
-
-                <div className="sp-product-main">
-
-                  <div className="sp-product-name">
-                    {product.name}
-                  </div>
-
-                  <div className="sp-product-category">
-                    {product.category}
-                  </div>
-
-                </div>
-
-
-                <div className="sp-product-metric">
-
-                  <span>
-                    Units sold
-                  </span>
-
-                  <strong>
-                    {product.units.toLocaleString(
-                      'en-IN'
-                    )}
-                  </strong>
-
-                </div>
-
-
-                <div className="sp-product-metric">
-
-                  <span>
-                    Revenue
-                  </span>
-
-                  <strong>
-                    {formatCurrency(
-                      product.revenue
-                    )}
-                  </strong>
-
-                </div>
-
-
-                <div className="sp-growth positive">
-                  <ArrowUpRight size={15} />
-
-                  {product.growth}%
-                </div>
-
-              </div>
-            )
           )}
+        </article>
 
-        </div>
-
-      </section>
-
-
-      {/* =================================================
-          NEEDS ATTENTION
-      ================================================= */}
-
-      <section className="sp-card">
-
-        <div className="sp-card-header">
-
-          <div>
-            <div className="sp-section-kicker warning-kicker">
-              PRODUCTS NEEDING ATTENTION
-            </div>
-
-            <h2>
-              Where action may be needed
-            </h2>
-
-            <p>
-              Products where current stock may
-              not comfortably cover upcoming demand.
-            </p>
-          </div>
-
-          <div className="sp-attention-count">
-            <AlertTriangle size={16} />
-            {attentionProducts.length} items
-          </div>
-
-        </div>
-
-
-        <div className="sp-attention-list">
-
-          {attentionProducts.map(
-            (product) => (
-
-              <div
-                className={`sp-attention-row ${product.severity}`}
-                key={product.name}
-              >
-
-                <div className="sp-attention-icon">
-
-                  {product.severity ===
-                  'critical' ? (
-                    <AlertTriangle size={20} />
-                  ) : product.severity ===
-                    'warning' ? (
-                    <AlertTriangle size={20} />
-                  ) : (
-                    <CheckCircle2 size={20} />
-                  )}
-
-                </div>
-
-
-                <div className="sp-attention-main">
-
-                  <div className="sp-attention-name">
-                    {product.name}
-                  </div>
-
-                  <div className="sp-attention-category">
-                    {product.category}
-                  </div>
-
-                </div>
-
-
-                <div className="sp-attention-stat">
-
-                  <span>
-                    Current stock
-                  </span>
-
-                  <strong>
-                    {product.stock} units
-                  </strong>
-
-                </div>
-
-
-                <div className="sp-attention-stat">
-
-                  <span>
-                    Daily demand
-                  </span>
-
-                  <strong>
-                    {product.demand} units
-                  </strong>
-
-                </div>
-
-
-                <div className="sp-attention-stat">
-
-                  <span>
-                    Coverage
-                  </span>
-
-                  <strong>
-                    {product.coverage} days
-                  </strong>
-
-                </div>
-
-
-                <div className="sp-attention-action">
-
-                  <span>
-                    {product.action}
-                  </span>
-
-                  <ChevronRight size={17} />
-
-                </div>
-
-              </div>
-
-            )
-          )}
-
-        </div>
-
-      </section>
-
-
-      {/* =================================================
-          CATEGORY + UPCOMING DEMAND
-      ================================================= */}
-
-      <div className="sp-two-column">
-
-        {/* CATEGORY */}
-
-        <section className="sp-card">
-
-          <div className="sp-card-header">
-
+        <article className="sdx-card sdx-import-card">
+          <div className="sdx-card-header">
             <div>
-              <div className="sp-section-kicker">
-                CATEGORY PERFORMANCE
-              </div>
-
-              <h2>
-                Demand by category
-              </h2>
-
-              <p>
-                Where most of the store's sales
-                are coming from.
-              </p>
+              <div className="sdx-card-kicker">HISTORICAL DATA</div>
+              <h2 className="sdx-card-title">Import sales history</h2>
             </div>
-
+            <div className="sdx-upload-icon"><FileSpreadsheet size={18} /></div>
           </div>
-
-
-          <div className="sp-chart-wrap">
-            <ResponsiveContainer
-              width="100%"
-              height={320}
-            >
-              <BarChart
-                data={categoryData}
-                layout="vertical"
-                margin={{
-                  top: 5,
-                  right: 20,
-                  left: 10,
-                  bottom: 5,
-                }}
-              >
-
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  horizontal={false}
-                />
-
-                <XAxis
-                  type="number"
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) =>
-                    `₹${Math.round(
-                      value / 1000
-                    )}k`
-                  }
-                />
-
-                <YAxis
-                  type="category"
-                  dataKey="category"
-                  tickLine={false}
-                  axisLine={false}
-                  width={85}
-                />
-
-                <Tooltip
-                  formatter={(value) => [
-                    formatCurrency(value),
-                    'Sales',
-                  ]}
-                />
-
-                <Bar
-                  dataKey="sales"
-                  radius={[
-                    0,
-                    6,
-                    6,
-                    0,
-                  ]}
-                  fill="currentColor"
-                />
-
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-
-          <div className="sp-category-total">
-
-            <span>
-              Total category sales
-            </span>
-
-            <strong>
-              {formatCurrency(
-                categoryTotal
-              )}
-            </strong>
-
-          </div>
-
-        </section>
-
-
-        {/* UPCOMING DEMAND */}
-
-        <section className="sp-card">
-
-          <div className="sp-card-header">
-
-            <div>
-              <div className="sp-section-kicker">
-                UPCOMING DEMAND
-              </div>
-
-              <h2>
-                What may be needed next
-              </h2>
-
-              <p>
-                Compare current stock with
-                expected demand.
-              </p>
-            </div>
-
-          </div>
-
-
-          <div className="sp-upcoming-list">
-
-            {upcomingDemand.map(
-              (item) => {
-
-                const isRestock =
-                  item.action === 'Restock';
-
-                const stockGap =
-                  item.expected -
-                  item.current;
-
-                return (
-                  <div
-                    className="sp-upcoming-row"
-                    key={item.name}
-                  >
-
-                    <div className="sp-upcoming-icon">
-                      {isRestock ? (
-                        <ShoppingCart
-                          size={18}
-                        />
-                      ) : (
-                        <Package
-                          size={18}
-                        />
-                      )}
-                    </div>
-
-
-                    <div className="sp-upcoming-main">
-
-                      <div className="sp-upcoming-name">
-                        {item.name}
-                      </div>
-
-                      <div className="sp-upcoming-bar">
-
-                        <div
-                          className="sp-upcoming-bar-fill"
-                          style={{
-                            width: `${Math.min(
-                              100,
-                              Math.max(
-                                15,
-                                (item.current /
-                                  Math.max(
-                                    item.expected,
-                                    1
-                                  )) *
-                                  100
-                              )
-                            )}%`,
-                          }}
-                        />
-
-                      </div>
-
-                    </div>
-
-
-                    <div className="sp-upcoming-values">
-
-                      <div>
-                        <span>
-                          Current
-                        </span>
-
-                        <strong>
-                          {item.current}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>
-                          Expected
-                        </span>
-
-                        <strong>
-                          {item.expected}
-                        </strong>
-                      </div>
-
-                    </div>
-
-
-                    <div
-                      className={`sp-upcoming-status ${
-                        isRestock
-                          ? 'restock'
-                          : item.action ===
-                            'Monitor'
-                          ? 'monitor'
-                          : 'healthy'
-                      }`}
-                    >
-                      {isRestock ? (
-                        <ShoppingCart
-                          size={14}
-                        />
-                      ) : (
-                        <CheckCircle2
-                          size={14}
-                        />
-                      )}
-
-                      {item.action}
-
-                    </div>
-
-                  </div>
-                );
-              }
-            )}
-
-          </div>
-
-        </section>
-
-      </div>
-
-
-      {/* =================================================
-          SEASONAL INSIGHTS
-      ================================================= */}
-
-      <section className="sp-card sp-seasonal-card">
-
-        <div className="sp-seasonal-icon">
-          <CalendarDays size={22} />
-        </div>
-
-        <div className="sp-seasonal-content">
-
-          <div className="sp-section-kicker">
-            SEASONAL INSIGHTS
-          </div>
-
-          <h2>
-            Prepare inventory before demand changes
-          </h2>
-
-          <p>
-            Dairy and fresh produce are showing
-            stronger near-term demand. Fresh tomatoes
-            are currently the most important item to
-            review, while milk demand is also moving
-            upward. Consider placing replenishment
-            orders before the next demand cycle.
+          <p className="sdx-import-intro">
+            Bring in past transactions from your billing or POS software to improve reporting and build demand history. Imports never change current stock.
           </p>
 
-        </div>
-
-
-        <div className="sp-seasonal-highlight">
-
-          <TrendingUp size={18} />
-
-          <div>
-
+          <label className="sdx-upload-zone" htmlFor="sdx-sales-csv">
+            <span className="sdx-upload-icon"><UploadCloud size={18} /></span>
             <span>
-              Highest upcoming growth
+              <span className="sdx-upload-title">
+                {selectedFile ? 'CSV file selected' : 'Choose a CSV file'}
+              </span>
+              <span className="sdx-upload-copy">Click to browse · Up to 5,000 rows</span>
+              {selectedFile && <span className="sdx-upload-name">{selectedFile.name}</span>}
             </span>
+          </label>
+          <input
+            ref={fileRef}
+            id="sdx-sales-csv"
+            className="sdx-file-input"
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => {
+              setSelectedFile(event.target.files?.[0] || null);
+              setFeedback(null);
+            }}
+          />
 
-            <strong>
-              Fresh Tomatoes · +15%
-            </strong>
-
+          <div className="sdx-import-actions">
+            <button
+              type="button"
+              className="sdx-button sdx-button-primary"
+              onClick={handleImport}
+              disabled={!selectedFile || importBusy}
+            >
+              <UploadCloud size={14} />
+              {importBusy ? 'Importing…' : 'Import sales'}
+            </button>
+            <button type="button" className="sdx-template-link" onClick={downloadTemplate}>
+              Download CSV template
+            </button>
           </div>
 
-        </div>
+          {selectedFile && (
+            <button
+              type="button"
+              className="sdx-template-link"
+              style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 8 }}
+              onClick={() => {
+                setSelectedFile(null);
+                if (fileRef.current) fileRef.current.value = '';
+              }}
+            >
+              <X size={12} /> Remove selected file
+            </button>
+          )}
 
+          {feedback && (
+            <div className={`sdx-feedback ${feedback.type}`}>
+              {feedback.type === 'success'
+                ? <CheckCircle2 size={14} />
+                : <AlertCircle size={14} />}
+              <span>{feedback.message}</span>
+            </div>
+          )}
+
+          <p className="sdx-import-note">
+            Required: date, sku, quantity. Optional: unit_price, channel, reference. Dates must be within the last 730 days. Use actual transaction records; the downloaded template contains headers only.
+          </p>
+        </article>
       </section>
-
-
-      {/* =================================================
-          PAGE FOOTER NOTE
-      ================================================= */}
-
-      <div className="sp-page-note">
-
-        <span>
-          StockPilot uses sales history, current
-          inventory and expected demand to highlight
-          business actions.
-        </span>
-
-        <span className="sp-page-note-right">
-          Updated just now
-        </span>
-
-      </div>
-
-
-      {/* =================================================
-          CSS
-      ================================================= */}
-
-      <style>{`
-
-        * {
-          box-sizing: border-box;
-        }
-
-        .sp-page {
-          width: 100%;
-          max-width: 1500px;
-          margin: 0 auto;
-          padding: 30px 32px 50px;
-        }
-
-
-        /* ===============================
-           HEADER
-        =============================== */
-
-        .sp-page-header {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          gap: 24px;
-          margin-bottom: 30px;
-        }
-
-        .sp-eyebrow,
-        .sp-section-kicker {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.12em;
-          color: #64748b;
-        }
-
-        .sp-page-header h1 {
-          margin: 7px 0 8px;
-          font-size: 32px;
-          line-height: 1.15;
-          font-weight: 750;
-          color: #0f172a;
-        }
-
-        .sp-page-header p {
-          margin: 0;
-          max-width: 700px;
-          color: #64748b;
-          font-size: 14px;
-          line-height: 1.6;
-        }
-
-        .sp-refresh-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          border: 1px solid #dbe2ea;
-          background: #ffffff;
-          color: #334155;
-          padding: 10px 15px;
-          border-radius: 9px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          white-space: nowrap;
-        }
-
-        .sp-refresh-btn:hover {
-          background: #f8fafc;
-          border-color: #cbd5e1;
-        }
-
-        .sp-refresh-btn:disabled {
-          opacity: 0.65;
-          cursor: default;
-        }
-
-        .sp-spin {
-          animation: sp-spin 1s linear infinite;
-        }
-
-        @keyframes sp-spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-
-        /* ===============================
-           SECTION
-        =============================== */
-
-        .sp-section {
-          margin-bottom: 22px;
-        }
-
-        .sp-section-heading {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          margin-bottom: 14px;
-        }
-
-        .sp-section-heading h2,
-        .sp-card-header h2 {
-          margin: 5px 0 0;
-          color: #0f172a;
-          font-size: 18px;
-          font-weight: 700;
-        }
-
-        .sp-card-header p {
-          margin: 5px 0 0;
-          color: #64748b;
-          font-size: 13px;
-          line-height: 1.5;
-        }
-
-
-        /* ===============================
-           STAT CARDS
-        =============================== */
-
-        .sp-stats-grid {
-          display: grid;
-          grid-template-columns:
-            repeat(4, minmax(0, 1fr));
-          gap: 16px;
-        }
-
-        .sp-stat-card {
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 13px;
-          padding: 18px;
-          min-height: 160px;
-          box-shadow:
-            0 1px 2px rgba(15, 23, 42, 0.03);
-        }
-
-        .sp-stat-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 17px;
-        }
-
-        .sp-stat-icon {
-          width: 38px;
-          height: 38px;
-          border-radius: 9px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f1f5f9;
-          color: #334155;
-        }
-
-        .sp-stat-trend {
-          display: inline-flex;
-          align-items: center;
-          gap: 2px;
-          color: #15803d;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        .sp-stat-title {
-          color: #64748b;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .sp-stat-value {
-          margin-top: 6px;
-          color: #0f172a;
-          font-size: 25px;
-          font-weight: 750;
-          letter-spacing: -0.02em;
-        }
-
-        .sp-stat-subtitle {
-          margin-top: 5px;
-          color: #94a3b8;
-          font-size: 11px;
-        }
-
-        .sp-stat-trend-label {
-          margin-top: 7px;
-          color: #15803d;
-          font-size: 11px;
-          font-weight: 600;
-        }
-
-
-        /* ===============================
-           CARD
-        =============================== */
-
-        .sp-card {
-          background: #ffffff;
-          border: 1px solid #e2e8f0;
-          border-radius: 13px;
-          padding: 22px;
-          margin-bottom: 20px;
-          box-shadow:
-            0 1px 2px rgba(15, 23, 42, 0.03);
-        }
-
-        .sp-card-header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 20px;
-          margin-bottom: 22px;
-        }
-
-        .sp-header-badge {
-          padding: 7px 10px;
-          border-radius: 7px;
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
-          color: #64748b;
-          font-size: 11px;
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-
-        /* ===============================
-           SALES CHART
-        =============================== */
-
-        .sp-sales-card {
-          margin-top: 2px;
-        }
-
-        .sp-control-group {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-        }
-
-        .sp-toggle {
-          display: inline-flex;
-          padding: 3px;
-          border-radius: 8px;
-          background: #f1f5f9;
-        }
-
-        .sp-toggle button {
-          border: none;
-          background: transparent;
-          color: #64748b;
-          padding: 7px 11px;
-          border-radius: 6px;
-          font-size: 11px;
-          font-weight: 600;
-          cursor: pointer;
-        }
-
-        .sp-toggle button.active {
-          background: #ffffff;
-          color: #0f172a;
-          box-shadow:
-            0 1px 3px rgba(15, 23, 42, 0.1);
-        }
-
-        .sp-chart-wrap {
-          width: 100%;
-        }
-
-        .sp-tooltip {
-          background: #0f172a;
-          border-radius: 8px;
-          padding: 9px 12px;
-          color: #ffffff;
-          box-shadow:
-            0 8px 20px rgba(15, 23, 42, 0.18);
-        }
-
-        .sp-tooltip-label {
-          font-size: 11px;
-          color: #cbd5e1;
-          margin-bottom: 3px;
-        }
-
-        .sp-tooltip-value {
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-
-        /* ===============================
-           TOP PRODUCTS
-        =============================== */
-
-        .sp-product-list {
-          width: 100%;
-        }
-
-        .sp-product-row {
-          display: grid;
-          grid-template-columns:
-            42px minmax(200px, 1fr)
-            150px 150px 75px;
-          align-items: center;
-          gap: 18px;
-          min-height: 72px;
-          padding: 13px 4px;
-          border-bottom: 1px solid #eef2f6;
-        }
-
-        .sp-product-row:last-child {
-          border-bottom: none;
-        }
-
-        .sp-rank {
-          width: 30px;
-          height: 30px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f1f5f9;
-          color: #475569;
-          font-size: 12px;
-          font-weight: 750;
-        }
-
-        .sp-product-name {
-          color: #0f172a;
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .sp-product-category {
-          margin-top: 3px;
-          color: #94a3b8;
-          font-size: 11px;
-        }
-
-        .sp-product-metric {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-
-        .sp-product-metric span {
-          color: #94a3b8;
-          font-size: 10px;
-        }
-
-        .sp-product-metric strong {
-          color: #334155;
-          font-size: 12px;
-        }
-
-        .sp-growth {
-          display: inline-flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 2px;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        .sp-growth.positive {
-          color: #15803d;
-        }
-
-
-        /* ===============================
-           ATTENTION
-        =============================== */
-
-        .warning-kicker {
-          color: #b45309;
-        }
-
-        .sp-attention-count {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 7px 10px;
-          border-radius: 7px;
-          background: #fff7ed;
-          color: #c2410c;
-          font-size: 11px;
-          font-weight: 700;
-          white-space: nowrap;
-        }
-
-        .sp-attention-list {
-          width: 100%;
-        }
-
-        .sp-attention-row {
-          display: grid;
-          grid-template-columns:
-            42px minmax(190px, 1fr)
-            130px 130px 110px 130px;
-          align-items: center;
-          gap: 18px;
-          min-height: 78px;
-          padding: 13px 4px;
-          border-bottom: 1px solid #eef2f6;
-        }
-
-        .sp-attention-row:last-child {
-          border-bottom: none;
-        }
-
-        .sp-attention-icon {
-          width: 36px;
-          height: 36px;
-          border-radius: 9px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .sp-attention-row.critical
-        .sp-attention-icon {
-          background: #fef2f2;
-          color: #dc2626;
-        }
-
-        .sp-attention-row.warning
-        .sp-attention-icon {
-          background: #fff7ed;
-          color: #ea580c;
-        }
-
-        .sp-attention-row.monitor
-        .sp-attention-icon {
-          background: #f0fdf4;
-          color: #16a34a;
-        }
-
-        .sp-attention-name {
-          color: #0f172a;
-          font-size: 13px;
-          font-weight: 700;
-        }
-
-        .sp-attention-category {
-          margin-top: 3px;
-          color: #94a3b8;
-          font-size: 11px;
-        }
-
-        .sp-attention-stat {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .sp-attention-stat span {
-          color: #94a3b8;
-          font-size: 10px;
-        }
-
-        .sp-attention-stat strong {
-          color: #334155;
-          font-size: 12px;
-        }
-
-        .sp-attention-action {
-          display: inline-flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 4px;
-          color: #475569;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        .sp-attention-row.critical
-        .sp-attention-action {
-          color: #dc2626;
-        }
-
-        .sp-attention-row.warning
-        .sp-attention-action {
-          color: #d97706;
-        }
-
-
-        /* ===============================
-           TWO COLUMN
-        =============================== */
-
-        .sp-two-column {
-          display: grid;
-          grid-template-columns:
-            minmax(0, 1fr)
-            minmax(0, 1fr);
-          gap: 20px;
-          align-items: start;
-        }
-
-        .sp-two-column .sp-card {
-          height: 100%;
-        }
-
-
-        /* ===============================
-           CATEGORY
-        =============================== */
-
-        .sp-category-total {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-top: 8px;
-          padding-top: 15px;
-          border-top: 1px solid #eef2f6;
-        }
-
-        .sp-category-total span {
-          color: #64748b;
-          font-size: 11px;
-        }
-
-        .sp-category-total strong {
-          color: #0f172a;
-          font-size: 15px;
-        }
-
-
-        /* ===============================
-           UPCOMING DEMAND
-        =============================== */
-
-        .sp-upcoming-list {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .sp-upcoming-row {
-          display: grid;
-          grid-template-columns:
-            36px minmax(120px, 1fr)
-            105px 82px;
-          align-items: center;
-          gap: 12px;
-          padding: 13px 0;
-          border-bottom: 1px solid #eef2f6;
-        }
-
-        .sp-upcoming-row:last-child {
-          border-bottom: none;
-        }
-
-        .sp-upcoming-icon {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f1f5f9;
-          color: #475569;
-        }
-
-        .sp-upcoming-name {
-          color: #334155;
-          font-size: 12px;
-          font-weight: 700;
-          margin-bottom: 8px;
-        }
-
-        .sp-upcoming-bar {
-          height: 5px;
-          width: 100%;
-          background: #f1f5f9;
-          border-radius: 20px;
-          overflow: hidden;
-        }
-
-        .sp-upcoming-bar-fill {
-          height: 100%;
-          border-radius: 20px;
-          background: #64748b;
-        }
-
-        .sp-upcoming-values {
-          display: flex;
-          gap: 12px;
-        }
-
-        .sp-upcoming-values div {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .sp-upcoming-values span {
-          color: #94a3b8;
-          font-size: 9px;
-        }
-
-        .sp-upcoming-values strong {
-          color: #334155;
-          font-size: 11px;
-        }
-
-        .sp-upcoming-status {
-          display: inline-flex;
-          align-items: center;
-          justify-content: flex-end;
-          gap: 4px;
-          font-size: 10px;
-          font-weight: 700;
-        }
-
-        .sp-upcoming-status.restock {
-          color: #dc2626;
-        }
-
-        .sp-upcoming-status.monitor {
-          color: #d97706;
-        }
-
-        .sp-upcoming-status.healthy {
-          color: #15803d;
-        }
-
-
-        /* ===============================
-           SEASONAL
-        =============================== */
-
-        .sp-seasonal-card {
-          display: grid;
-          grid-template-columns: 48px minmax(0, 1fr) 270px;
-          align-items: center;
-          gap: 18px;
-          background: #fafbfc;
-        }
-
-        .sp-seasonal-icon {
-          width: 44px;
-          height: 44px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 11px;
-          background: #f1f5f9;
-          color: #475569;
-        }
-
-        .sp-seasonal-content h2 {
-          margin: 5px 0 7px;
-          color: #0f172a;
-          font-size: 17px;
-        }
-
-        .sp-seasonal-content p {
-          margin: 0;
-          max-width: 780px;
-          color: #64748b;
-          font-size: 12px;
-          line-height: 1.65;
-        }
-
-        .sp-seasonal-highlight {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 13px;
-          border: 1px solid #e2e8f0;
-          border-radius: 9px;
-          background: #ffffff;
-          color: #334155;
-        }
-
-        .sp-seasonal-highlight > svg {
-          flex-shrink: 0;
-        }
-
-        .sp-seasonal-highlight div {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-
-        .sp-seasonal-highlight span {
-          color: #94a3b8;
-          font-size: 9px;
-        }
-
-        .sp-seasonal-highlight strong {
-          color: #334155;
-          font-size: 11px;
-        }
-
-
-        /* ===============================
-           FOOTER NOTE
-        =============================== */
-
-        .sp-page-note {
-          display: flex;
-          justify-content: space-between;
-          gap: 20px;
-          padding: 5px 3px;
-          color: #94a3b8;
-          font-size: 10px;
-        }
-
-        .sp-page-note-right {
-          white-space: nowrap;
-        }
-
-
-        /* ===============================
-           RESPONSIVE
-        =============================== */
-
-        @media (max-width: 1200px) {
-
-          .sp-stats-grid {
-            grid-template-columns:
-              repeat(2, minmax(0, 1fr));
-          }
-
-          .sp-attention-row {
-            grid-template-columns:
-              42px minmax(180px, 1fr)
-              110px 110px 90px 110px;
-            gap: 12px;
-          }
-
-          .sp-product-row {
-            grid-template-columns:
-              42px minmax(160px, 1fr)
-              125px 125px 65px;
-            gap: 12px;
-          }
-
-          .sp-seasonal-card {
-            grid-template-columns:
-              48px 1fr;
-          }
-
-          .sp-seasonal-highlight {
-            grid-column: 2;
-          }
-        }
-
-
-        @media (max-width: 900px) {
-
-          .sp-page {
-            padding: 24px 20px 40px;
-          }
-
-          .sp-page-header {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-
-          .sp-control-group {
-            justify-content: flex-start;
-          }
-
-          .sp-two-column {
-            grid-template-columns: 1fr;
-          }
-
-          .sp-attention-row {
-            grid-template-columns:
-              42px 1fr 100px;
-          }
-
-          .sp-attention-stat:nth-of-type(1),
-          .sp-attention-stat:nth-of-type(2) {
-            display: none;
-          }
-
-          .sp-attention-action {
-            justify-content: flex-start;
-          }
-
-          .sp-product-row {
-            grid-template-columns:
-              42px 1fr 100px;
-          }
-
-          .sp-product-metric:nth-of-type(2) {
-            display: none;
-          }
-
-          .sp-growth {
-            justify-content: flex-start;
-          }
-
-          .sp-upcoming-row {
-            grid-template-columns:
-              36px 1fr 80px;
-          }
-
-          .sp-upcoming-values {
-            display: none;
-          }
-
-          .sp-upcoming-status {
-            justify-content: flex-start;
-          }
-        }
-
-
-        @media (max-width: 640px) {
-
-          .sp-page {
-            padding: 20px 14px 32px;
-          }
-
-          .sp-page-header h1 {
-            font-size: 27px;
-          }
-
-          .sp-stats-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .sp-card {
-            padding: 17px;
-            border-radius: 11px;
-          }
-
-          .sp-card-header {
-            flex-direction: column;
-            gap: 12px;
-          }
-
-          .sp-control-group {
-            width: 100%;
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .sp-toggle {
-            width: 100%;
-          }
-
-          .sp-toggle button {
-            flex: 1;
-          }
-
-          .sp-product-row {
-            grid-template-columns:
-              34px 1fr 55px;
-            gap: 10px;
-          }
-
-          .sp-product-metric {
-            display: none;
-          }
-
-          .sp-growth {
-            justify-content: flex-end;
-          }
-
-          .sp-attention-row {
-            grid-template-columns:
-              36px 1fr;
-            gap: 10px;
-          }
-
-          .sp-attention-stat,
-          .sp-attention-action {
-            display: none;
-          }
-
-          .sp-seasonal-card {
-            grid-template-columns: 42px 1fr;
-            gap: 12px;
-          }
-
-          .sp-seasonal-highlight {
-            grid-column: 1 / -1;
-          }
-
-          .sp-page-note {
-            flex-direction: column;
-            gap: 5px;
-          }
-
-        }
-
-      `}</style>
-
-    </div>
+    </main>
   );
 }
