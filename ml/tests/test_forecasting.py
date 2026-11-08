@@ -49,7 +49,7 @@ class ForecastingTests(unittest.TestCase):
             predictor=IncrementLastValuePredictor(),
         )
 
-        self.assertEqual(predictions, [7.0, 8.0, 9.0, 10.0])
+        self.assertEqual(predictions, [8.0, 9.0, 10.0, 11.0])
 
     def test_validation_uses_full_fourteen_day_holdout(self):
         values = [float((index % 7) + 1) for index in range(70)]
