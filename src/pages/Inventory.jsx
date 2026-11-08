@@ -35,7 +35,6 @@ import { PRODUCT_CATALOG } from '../data/productCatalog.js';
 import {
   PRODUCTS,
   CATEGORIES,
-  stockStatus,
 } from '../data/sampleData.js';
 
 import '../styles/dashboard.css';
@@ -70,7 +69,28 @@ const STATUS_BADGE = {
     label: 'Overstocked',
     className: 'status-overstock',
   },
+
+  unknown: {
+    label: 'Needs Sales History',
+    className: 'status-unknown',
+  },
 };
+
+
+function getInventoryStatus(product) {
+  const stock = Number(product?.stock ?? product?.currentStock ?? 0);
+
+  if (stock <= 0) return 'out';
+  if (!product?.hasDemandHistory) return 'unknown';
+
+  const reorderPoint = Number(product?.reorderPoint ?? 0);
+  if (!(reorderPoint > 0)) return 'unknown';
+
+  if (stock <= reorderPoint * 0.5) return 'critical';
+  if (stock <= reorderPoint) return 'low';
+  if (stock > reorderPoint * 2.2) return 'overstock';
+  return 'healthy';
+}
 
 
 /* =========================================================
@@ -726,6 +746,15 @@ function InventoryEnterpriseStyles() {
         background: #8b5cf6;
       }
 
+      .sp-status.status-unknown {
+        background: #f1f5f9;
+        color: #475569;
+      }
+
+      .sp-status.status-unknown .sp-status-dot {
+        background: #94a3b8;
+      }
+
       .sp-empty {
         padding: 65px 20px !important;
         text-align: center !important;
@@ -1186,7 +1215,7 @@ function InventoryEnterpriseStyles() {
 function StatusBadge({ status }) {
   const badge =
     STATUS_BADGE[status] ||
-    STATUS_BADGE.healthy;
+    STATUS_BADGE.unknown;
 
   return (
     <span
@@ -1341,6 +1370,10 @@ function ProductDetail({
         ? forecastDailyDemand
         : avgDailySales;
 
+    const hasDemandHistory =
+      product?.hasDemandHistory ??
+      (finalForecast > 0);
+
     const reorderPoint =
       Number(
         product?.reorderPoint ??
@@ -1377,15 +1410,16 @@ function ProductDetail({
       );
 
     const daysLeft =
-      finalForecast > 0
+      hasDemandHistory && finalForecast > 0
         ? stock / finalForecast
-        : Infinity;
+        : null;
 
     return {
       ...product,
       name,
       stock,
       avgDailySales,
+      hasDemandHistory,
       predictedDemand: finalForecast,
       reorderPoint,
       safetyStock,
@@ -1481,8 +1515,14 @@ function ProductDetail({
   };
 
   const recommendation =
-    safeProduct.stock <=
-    safeProduct.reorderPoint
+    !safeProduct.hasDemandHistory
+      ? {
+          type: 'info',
+          title: 'Sales History Needed',
+          text: 'Record sales transactions for this product. StockPilot needs actual sales history before it can estimate demand, set a reorder point or assess overstock risk.',
+        }
+      : safeProduct.stock <=
+        safeProduct.reorderPoint
       ? {
           type: 'warning',
           title:
@@ -1622,12 +1662,12 @@ function ProductDetail({
               Forecast Daily Demand
             </span>
             <strong>
-              {safeProduct.predictedDemand.toFixed(
-                2
-              )}
+              {safeProduct.hasDemandHistory
+                ? safeProduct.predictedDemand.toFixed(2)
+                : '—'}
             </strong>
             <small>
-              units / day
+              {safeProduct.hasDemandHistory ? 'units / day' : 'Not enough sales history'}
             </small>
           </div>
 
@@ -1636,10 +1676,12 @@ function ProductDetail({
               Predicted 7-Day Demand
             </span>
             <strong>
-              {forecast7Days.toFixed(1)}
+              {safeProduct.hasDemandHistory
+                ? forecast7Days.toFixed(1)
+                : '—'}
             </strong>
             <small>
-              units
+              {safeProduct.hasDemandHistory ? 'units' : 'Not available yet'}
             </small>
           </div>
 
@@ -1648,12 +1690,12 @@ function ProductDetail({
               Reorder Point
             </span>
             <strong>
-              {safeProduct.reorderPoint.toFixed(
-                2
-              )}
+              {safeProduct.hasDemandHistory
+                ? safeProduct.reorderPoint.toFixed(2)
+                : '—'}
             </strong>
             <small>
-              units
+              {safeProduct.hasDemandHistory ? 'units' : 'Not available yet'}
             </small>
           </div>
 
@@ -1662,12 +1704,12 @@ function ProductDetail({
               Safety Stock
             </span>
             <strong>
-              {safeProduct.safetyStock.toFixed(
-                2
-              )}
+              {safeProduct.hasDemandHistory
+                ? safeProduct.safetyStock.toFixed(2)
+                : '—'}
             </strong>
             <small>
-              units
+              {safeProduct.hasDemandHistory ? 'units' : 'Not available yet'}
             </small>
           </div>
 
@@ -1688,16 +1730,12 @@ function ProductDetail({
               Days Remaining
             </span>
             <strong>
-              {Number.isFinite(
-                safeProduct.daysRemaining
-              )
-                ? safeProduct.daysRemaining.toFixed(
-                    1
-                  )
-                : '∞'}
+              {Number.isFinite(safeProduct.daysRemaining)
+                ? safeProduct.daysRemaining.toFixed(1)
+                : '—'}
             </strong>
             <small>
-              days
+              {safeProduct.hasDemandHistory ? 'days' : 'Not available yet'}
             </small>
           </div>
 
@@ -1997,11 +2035,27 @@ export default function Inventory() {
             product.stock ?? 0
           );
 
+        const hasDemandHistory = [
+          product.predictedDemand,
+          product.predicted_daily_demand,
+          product.averageDailyDemand,
+          product.average_daily_demand,
+          product.avgDailySales,
+          product.avg_daily_sales,
+        ].some((value) => (
+          value !== null &&
+          value !== undefined &&
+          Number.isFinite(Number(value)) &&
+          Number(value) > 0
+        ));
+
         const updatedProduct = {
           ...product,
 
           stock:
             updatedStock,
+
+          hasDemandHistory,
 
           avgDailySales:
             Number(
@@ -2059,10 +2113,9 @@ export default function Inventory() {
             : updatedProduct.avgDailySales;
 
         const calculatedDays =
-          demandForDays > 0
-            ? updatedStock /
-              demandForDays
-            : Infinity;
+          hasDemandHistory && demandForDays > 0
+            ? updatedStock / demandForDays
+            : null;
 
         return {
           ...updatedProduct,
@@ -2076,9 +2129,7 @@ export default function Inventory() {
             calculatedDays,
 
           status:
-            stockStatus(
-              updatedProduct
-            ),
+            getInventoryStatus(updatedProduct),
         };
       }
     );
@@ -2964,10 +3015,7 @@ export default function Inventory() {
                           <td>
 
                             <span className="sp-number">
-                              {Number(
-                                product.predictedDemand ||
-                                  0
-                              ).toFixed(2)}
+                              {product.hasDemandHistory ? Number(product.predictedDemand).toFixed(2) : '—'}
                             </span>
 
                             <span className="sp-unit">
@@ -3007,17 +3055,13 @@ export default function Inventory() {
 
                               <div>
                                 <span className="sp-number">
-                                  {Number.isFinite(
-                                    product.daysRemaining
-                                  )
-                                    ? product.daysRemaining.toFixed(
-                                        1
-                                      )
-                                    : '∞'}
+                                  {Number.isFinite(product.daysRemaining)
+                                    ? product.daysRemaining.toFixed(1)
+                                    : '—'}
                                 </span>
 
                                 <span className="sp-unit">
-                                  days
+                                  {product.hasDemandHistory ? 'days' : 'not available'}
                                 </span>
                               </div>
 
@@ -3031,10 +3075,7 @@ export default function Inventory() {
                           <td>
 
                             <span className="sp-number">
-                              {Number(
-                                product.reorderPoint ||
-                                  0
-                              ).toFixed(2)}
+                              {product.hasDemandHistory ? Number(product.reorderPoint).toFixed(2) : '—'}
                             </span>
 
                             <span className="sp-unit">
