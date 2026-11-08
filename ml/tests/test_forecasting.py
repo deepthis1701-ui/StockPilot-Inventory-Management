@@ -14,6 +14,7 @@ import numpy as np
 
 from models.forecasting import (
     VALIDATION_DAYS,
+    _build_full_training_data,
     _build_validation_data,
     _recursive_forecast,
     generate_forecasts,
@@ -72,6 +73,25 @@ class ForecastingTests(unittest.TestCase):
         self.assertEqual(contexts[0]["actual"], values[-VALIDATION_DAYS:])
         self.assertEqual(train_x.shape[1], 13)
         self.assertEqual(len(train_x), len(train_y))
+
+    def test_final_training_data_includes_validation_window_targets(self):
+        values = [float((index % 7) + 1) for index in range(70)]
+        series = [{
+            "id": "product-1",
+            "name": "Test product",
+            "sku": "TEST-001",
+            "values": values,
+            "last_date": date(2026, 11, 8),
+            "history_days": len(values),
+            "sales_days": len(values),
+        }]
+
+        train_x, train_y = _build_full_training_data(series)
+
+        # 70 observations produce targets at indices 28 through 69.
+        self.assertEqual(len(train_y), 70 - 28)
+        self.assertEqual(train_x.shape, (70 - 28, 13))
+        self.assertEqual(train_y[-1], values[-1])
 
     def test_insufficient_history_does_not_create_a_forecast(self):
         result = generate_forecasts(
