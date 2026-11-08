@@ -492,13 +492,28 @@ app.get('/api/top-products', asyncRoute(async (req, res) => {
 }));
 
 app.get('/api/dashboard', asyncRoute(async (req, res) => {
-  const [snapshot, sales] = await Promise.all([
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const [snapshot, sales, salesTodayRows] = await Promise.all([
     createInventorySnapshot(),
     SalesTransaction.aggregate([
       { $group: { _id: null, totalRevenue: { $sum: '$totalAmount' }, totalUnits: { $sum: '$quantity' }, transactionCount: { $sum: 1 } } }
+    ]),
+    SalesTransaction.aggregate([
+      { $match: { transactionDate: { $gte: todayStart } } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$totalAmount' },
+          totalUnits: { $sum: '$quantity' },
+          transactionCount: { $sum: 1 }
+        }
+      }
     ])
   ]);
   const salesSummary = sales[0] || { totalRevenue: 0, totalUnits: 0, transactionCount: 0 };
+  const salesToday = salesTodayRows[0] || { totalRevenue: 0, totalUnits: 0, transactionCount: 0 };
   res.json({
     products: snapshot.products,
     inventory: snapshot.stats,
@@ -515,6 +530,7 @@ app.get('/api/dashboard', asyncRoute(async (req, res) => {
       }
     },
     sales: salesSummary,
+    salesToday,
     recommendations: snapshot.products.filter((item) => item.recommendedQty > 0)
   });
 }));
