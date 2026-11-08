@@ -1,9 +1,9 @@
-
 .sdx-page {
-  --sdx-ink: #14243b;
-  --sdx-muted: #748198;
-  --sdx-border: #e7ecf3;
-  --sdx-blue: #3568dc;
+  --sdx-ink: #f9fafb;
+  --sdx-muted: #9ca3af;
+  --sdx-border: #374151;
+  --sdx-blue: #3b82f6;
+  --sdx-cyan: #06b6d4;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -20,7 +20,7 @@
   gap: 20px;
 }
 .sdx-eyebrow {
-  color: #5476b7;
+  color: #06b6d4;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .13em;
@@ -28,7 +28,7 @@
   margin-bottom: 7px;
 }
 .sdx-title {
-  color: #15253c;
+  color: #f9fafb;
   font-size: clamp(25px, 2.4vw, 32px);
   font-weight: 780;
   letter-spacing: -.04em;
@@ -54,8 +54,8 @@
   padding: 0 12px;
   border: 1px solid var(--sdx-border);
   border-radius: 10px;
-  background: #fff;
-  color: #65748b;
+  background: #1f2937;
+  color: #9ca3af;
   font-size: 11px;
   font-weight: 650;
 }
@@ -77,22 +77,22 @@
   opacity: .55;
 }
 .sdx-button-primary {
-  background: #2f63d5;
+  background: #3b82f6;
   color: #fff;
-  box-shadow: 0 5px 13px rgba(47, 99, 213, .16);
+  box-shadow: 0 4px 14px rgba(59, 130, 246, .25);
 }
 .sdx-button-primary:hover:not(:disabled) {
-  background: #2454be;
+  background: #2563eb;
   transform: translateY(-1px);
 }
 .sdx-button-ghost {
-  background: #fff;
+  background: #1f2937;
   border-color: var(--sdx-border);
-  color: #50617b;
+  color: #f9fafb;
 }
 .sdx-button-ghost:hover:not(:disabled) {
-  border-color: #c9d5e8;
-  background: #f9fbff;
+  border-color: #4b5563;
+  background: #283548;
 }
 .sdx-spin {
   animation: sdx-spin 1s linear infinite;
@@ -110,9 +110,9 @@
   min-height: 137px;
   padding: 17px 18px;
   border: 1px solid var(--sdx-border);
-  border-radius: 15px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(21, 40, 70, .025);
+  border-radius: 14px;
+  background: #1f2937;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
 }
 .sdx-metric-top {
   display: flex;
@@ -127,19 +127,19 @@
   height: 35px;
   border-radius: 11px;
 }
-.sdx-metric-icon.blue { color: #3266d5; background: #edf3ff; }
-.sdx-metric-icon.violet { color: #7553c8; background: #f3efff; }
-.sdx-metric-icon.cyan { color: #168aa7; background: #eaf8fb; }
-.sdx-metric-icon.amber { color: #b7791f; background: #fff6e6; }
+.sdx-metric-icon.blue { color: #3b82f6; background: rgba(59, 130, 246, 0.15); }
+.sdx-metric-icon.violet { color: #8b5cf6; background: rgba(139, 92, 246, 0.15); }
+.sdx-metric-icon.cyan { color: #06b6d4; background: rgba(6, 182, 212, 0.15); }
+.sdx-metric-icon.amber { color: #f59e0b; background: rgba(245, 158, 11, 0.15); }
 .sdx-metric-label {
   margin-top: 14px;
-  color: #78869b;
+  color: #9ca3af;
   font-size: 11px;
   font-weight: 650;
 }
 .sdx-metric-value {
   margin-top: 3px;
-  color: #172942;
+  color: #f9fafb;
   font-size: 25px;
   font-weight: 780;
   letter-spacing: -.035em;
@@ -148,7 +148,7 @@
 }
 .sdx-metric-note {
   margin-top: 5px;
-  color: #9aa5b5;
+  color: #6b7280;
   font-size: 10px;
 }
 
@@ -162,9 +162,9 @@
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--sdx-border);
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(21, 40, 70, .025);
+  border-radius: 14px;
+  background: #1f2937;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
 }
 .sdx-card-header {
   display: flex;
@@ -174,7 +174,7 @@
   margin-bottom: 16px;
 }
 .sdx-card-kicker {
-  color: #8190a5;
+  color: #06b6d4;
   font-size: 9px;
   font-weight: 800;
   letter-spacing: .12em;
@@ -182,14 +182,14 @@
 }
 .sdx-card-title {
   margin-top: 5px;
-  color: #1a2b43;
+  color: #f9fafb;
   font-size: 16px;
   font-weight: 750;
   letter-spacing: -.02em;
 }
 .sdx-card-description {
   margin-top: 4px;
-  color: #8793a5;
+  color: #9ca3af;
   font-size: 11px;
   line-height: 1.5;
 }
@@ -204,23 +204,25 @@
   align-items: center;
   gap: 2px;
   padding: 3px;
-  border: 1px solid #edf0f5;
+  border: 1px solid #374151;
   border-radius: 9px;
-  background: #f7f9fc;
+  background: #111827;
 }
 .sdx-segment button {
   min-height: 26px;
   padding: 0 9px;
   border-radius: 6px;
   background: transparent;
-  color: #7d899c;
+  color: #9ca3af;
   font-size: 10px;
   font-weight: 700;
+  cursor: pointer;
+  transition: all .15s ease;
 }
 .sdx-segment button.active {
-  background: #fff;
-  color: #2f5fca;
-  box-shadow: 0 1px 4px rgba(20, 36, 59, .1);
+  background: #1f2937;
+  color: #06b6d4;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
 }
 .sdx-chart-wrap {
   width: 100%;
@@ -235,7 +237,7 @@
   min-height: 230px;
   padding: 25px;
   text-align: center;
-  color: #8794a7;
+  color: #9ca3af;
 }
 .sdx-empty-icon {
   display: grid;
@@ -244,11 +246,11 @@
   height: 43px;
   margin-bottom: 11px;
   border-radius: 13px;
-  background: #f2f6fc;
-  color: #6281ba;
+  background: #111827;
+  color: #3b82f6;
 }
 .sdx-empty-title {
-  color: #43536a;
+  color: #f9fafb;
   font-size: 12px;
   font-weight: 750;
 }
@@ -257,22 +259,23 @@
   margin-top: 5px;
   font-size: 10px;
   line-height: 1.55;
+  color: #9ca3af;
 }
 .sdx-tooltip {
   min-width: 130px;
   padding: 10px 12px;
-  border: 1px solid rgba(230, 235, 243, .9);
+  border: 1px solid #374151;
   border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 8px 25px rgba(18, 38, 68, .13);
+  background: #111827;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
 }
 .sdx-tooltip-date {
-  color: #8a96a8;
+  color: #9ca3af;
   font-size: 10px;
   margin-bottom: 4px;
 }
 .sdx-tooltip-value {
-  color: #1b2c45;
+  color: #f9fafb;
   font-size: 13px;
   font-weight: 800;
 }
@@ -287,10 +290,11 @@
   overflow: hidden;
   flex: 1;
   min-height: 200px;
-  border: 1px solid #dfe8f7;
-  border-radius: 16px;
+  border: 1px solid #374151;
+  border-radius: 14px;
   padding: 20px;
-  background: linear-gradient(145deg, #f4f8ff 0%, #fff 78%);
+  background: #1f2937;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .25);
 }
 .sdx-forecast-heading {
   display: flex;
@@ -304,8 +308,8 @@
   width: 36px;
   height: 36px;
   border-radius: 11px;
-  background: #e7efff;
-  color: #3e6fcf;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
 }
 .sdx-status {
   display: inline-flex;
@@ -313,16 +317,16 @@
   gap: 5px;
   padding: 5px 8px;
   border-radius: 20px;
-  background: #f0f3f7;
-  color: #6e7b8e;
+  background: #111827;
+  color: #9ca3af;
   font-size: 9px;
   font-weight: 750;
 }
-.sdx-status.ready { color: #187a55; background: #eaf7f0; }
-.sdx-status.waiting { color: #9a6817; background: #fff6e6; }
+.sdx-status.ready { color: #10b981; background: rgba(16, 185, 129, 0.15); }
+.sdx-status.waiting { color: #f59e0b; background: rgba(245, 158, 11, 0.15); }
 .sdx-forecast-copy {
   margin-top: 14px;
-  color: #78869a;
+  color: #9ca3af;
   font-size: 11px;
   line-height: 1.6;
 }
@@ -338,15 +342,15 @@
   justify-content: space-between;
   gap: 12px;
   padding-top: 9px;
-  border-top: 1px solid #e8eef8;
+  border-top: 1px solid #374151;
 }
 .sdx-forecast-product-name {
-  color: #43546d;
+  color: #f9fafb;
   font-size: 10px;
   font-weight: 700;
 }
 .sdx-forecast-product-value {
-  color: #1e4fae;
+  color: #06b6d4;
   font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
@@ -368,7 +372,7 @@
   align-items: center;
   gap: 12px;
   min-height: 57px;
-  border-top: 1px solid #f0f2f6;
+  border-top: 1px solid #374151;
 }
 .sdx-product-rank {
   display: grid;
@@ -376,23 +380,23 @@
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: #f1f5fb;
-  color: #72819a;
+  background: #111827;
+  color: #9ca3af;
   font-size: 10px;
   font-weight: 800;
 }
 .sdx-product-name {
-  color: #34465f;
+  color: #f9fafb;
   font-size: 11px;
   font-weight: 750;
 }
 .sdx-product-sku {
   margin-top: 2px;
-  color: #9aa5b4;
+  color: #9ca3af;
   font-size: 9px;
 }
 .sdx-product-number {
-  color: #45566d;
+  color: #f9fafb;
   font-size: 11px;
   font-weight: 750;
   text-align: right;
@@ -401,7 +405,7 @@
 .sdx-product-number span {
   display: block;
   margin-bottom: 2px;
-  color: #9aa5b4;
+  color: #9ca3af;
   font-size: 8px;
   font-weight: 650;
   text-transform: uppercase;
@@ -412,11 +416,11 @@
   align-items: flex-start;
   gap: 10px;
   padding: 17px 2px 4px;
-  color: #8592a5;
+  color: #9ca3af;
   font-size: 10px;
   line-height: 1.55;
 }
-.sdx-empty-inline svg { flex: 0 0 auto; color: #8296b7; }
+.sdx-empty-inline svg { flex: 0 0 auto; color: #06b6d4; }
 
 .sdx-import-card {
   display: flex;
@@ -424,7 +428,7 @@
 }
 .sdx-import-intro {
   margin: -5px 0 14px;
-  color: #8592a5;
+  color: #9ca3af;
   font-size: 10px;
   line-height: 1.55;
 }
@@ -434,15 +438,15 @@
   gap: 12px;
   min-height: 82px;
   padding: 13px;
-  border: 1px dashed #cbd7e8;
+  border: 1px dashed #374151;
   border-radius: 12px;
-  background: #fafcff;
+  background: #111827;
   cursor: pointer;
   transition: border-color .18s ease, background .18s ease;
 }
 .sdx-upload-zone:hover {
-  border-color: #6e91d4;
-  background: #f5f8ff;
+  border-color: #3b82f6;
+  background: #1e293b;
 }
 .sdx-upload-icon {
   display: grid;
@@ -451,23 +455,23 @@
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: #eaf1ff;
-  color: #3769ce;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
 }
 .sdx-upload-title {
-  color: #3b4d66;
+  color: #f9fafb;
   font-size: 11px;
   font-weight: 750;
 }
 .sdx-upload-copy {
   margin-top: 3px;
-  color: #929eaf;
+  color: #9ca3af;
   font-size: 9px;
 }
 .sdx-upload-name {
   display: block;
   margin-top: 4px;
-  color: #2f63c8;
+  color: #06b6d4;
   font-size: 9px;
   font-weight: 700;
   overflow-wrap: anywhere;
@@ -491,15 +495,15 @@
 .sdx-template-link {
   border: 0;
   background: transparent;
-  color: #456fc1;
+  color: #06b6d4;
   font-size: 10px;
   font-weight: 700;
   cursor: pointer;
 }
-.sdx-template-link:hover { color: #214fae; text-decoration: underline; }
+.sdx-template-link:hover { color: #38bdf8; text-decoration: underline; }
 .sdx-import-note {
   margin-top: 11px;
-  color: #9aa5b4;
+  color: #6b7280;
   font-size: 9px;
   line-height: 1.55;
 }
@@ -513,8 +517,8 @@
   font-size: 10px;
   line-height: 1.5;
 }
-.sdx-feedback.success { color: #18744e; background: #edf8f2; }
-.sdx-feedback.error { color: #b33a3a; background: #fff1f1; }
+.sdx-feedback.success { color: #10b981; background: rgba(16, 185, 129, 0.15); }
+.sdx-feedback.error { color: #ef4444; background: rgba(239, 68, 68, 0.15); }
 .sdx-feedback svg { flex: 0 0 auto; margin-top: 1px; }
 
 .sdx-error-banner {
@@ -522,10 +526,10 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid #f1d8d8;
+  border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 10px;
-  background: #fff7f7;
-  color: #a84a4a;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
   font-size: 10px;
 }
 @media (max-width: 1180px) {

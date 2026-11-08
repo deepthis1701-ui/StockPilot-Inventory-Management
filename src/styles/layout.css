@@ -10,6 +10,7 @@
 .app-main {
   min-height: 100vh;
   margin-left: 250px;
+  background: #111827;
   transition: margin-left var(--t-slow);
 }
 
@@ -53,8 +54,8 @@
   display: flex;
   flex-direction: column;
 
-  background: #172033;
-  border-right: 1px solid #27334a;
+  background: #101827;
+  border-right: 1px solid #1f2937;
 
   transition:
     width var(--t-slow),
@@ -69,14 +70,14 @@
 /* ---------- Sidebar Header ---------- */
 
 .sidebar-header {
-  height: 72px;
+  height: 68px;
   padding: 0 18px;
 
   display: flex;
   align-items: center;
   gap: 12px;
 
-  border-bottom: 1px solid #27334a;
+  border-bottom: 1px solid #1f2937;
   flex-shrink: 0;
 }
 
@@ -91,7 +92,7 @@
 
   border-radius: 9px;
 
-  background: var(--c-primary);
+  background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
   color: #fff;
 }
 
@@ -189,17 +190,17 @@
 
   min-height: 40px;
   width: 100%;
-  padding: 0 11px;
+  padding: 0 12px;
 
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
 
   border: 0;
-  border-radius: 7px;
+  border-radius: 8px;
 
   background: transparent;
-  color: #aeb9ca;
+  color: #94a3b8;
 
   text-decoration: none;
   font-size: 13px;
@@ -213,33 +214,36 @@
 }
 
 .nav-item svg {
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   color: currentColor;
 }
 
 .nav-item:hover {
-  background: #222d42;
-  color: #ffffff;
+  background: #1f2937;
+  color: #f9fafb;
 }
 
 .nav-item.active {
-  background: #263a59;
-  color: #ffffff;
+  background: #1f2937;
+  color: #f9fafb;
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .nav-item.active::before {
   content: '';
 
   position: absolute;
-  left: -12px;
+  left: 0;
   top: 8px;
   bottom: 8px;
 
   width: 3px;
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 3px 3px 0;
 
-  background: var(--c-primary);
+  background: #06b6d4;
 }
 
 .nav-label {
@@ -337,7 +341,7 @@
 .sidebar-footer {
   padding: 14px 12px;
 
-  border-top: 1px solid #27334a;
+  border-top: 1px solid #1f2937;
 
   flex-shrink: 0;
 }
@@ -363,8 +367,9 @@
 
   border-radius: 50%;
 
-  background: #263a59;
-  color: #ffffff;
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: #06b6d4;
 
   font-size: 11px;
   font-weight: 700;
@@ -427,11 +432,11 @@
   align-items: center;
   justify-content: center;
 
-  border: 1px solid #334155;
+  border: 1px solid #374151;
   border-radius: 50%;
 
-  background: #172033;
-  color: #cbd5e1;
+  background: #101827;
+  color: #9ca3af;
 
   cursor: pointer;
 
@@ -447,9 +452,9 @@
 }
 
 .sidebar-collapse-btn:hover {
-  background: #263a59;
-  color: #ffffff;
-  border-color: #475569;
+  background: #1f2937;
+  color: #f9fafb;
+  border-color: #06b6d4;
 }
 
 .sidebar-collapse-btn svg {
@@ -480,7 +485,7 @@
   position: sticky;
   top: 0;
 
-  height: 72px;
+  height: 68px;
   width: 100%;
 
   z-index: 90;
@@ -491,8 +496,9 @@
 
   padding: 0 28px;
 
-  background: var(--c-surface);
-  border-bottom: 1px solid var(--c-divider);
+  background: #111827;
+  border-bottom: 1px solid #1f2937;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.25);
 }
 
 
@@ -870,18 +876,18 @@
    ========================================================= */
 
 .topbar-profile {
-  height: 42px;
+  height: 38px;
 
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
 
-  padding: 4px 7px;
+  padding: 0 12px 0 6px;
 
-  border: 1px solid transparent;
+  border: 1px solid #374151;
   border-radius: 8px;
 
-  background: transparent;
+  background: #1f2937;
   color: var(--c-text);
 
   cursor: pointer;
@@ -893,25 +899,25 @@
 
 .topbar-profile:hover,
 .topbar-profile.active {
-  background: var(--c-surface-hover);
-  border-color: var(--c-border);
+  background: #283548;
+  border-color: #06b6d4;
 }
 
 .topbar-profile-avatar {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  border-radius: 50%;
+  border-radius: 6px;
 
-  background: var(--c-primary-soft);
-  color: var(--c-primary);
+  background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+  color: #ffffff;
 
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 

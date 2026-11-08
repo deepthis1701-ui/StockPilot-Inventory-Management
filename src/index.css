@@ -1,45 +1,47 @@
 :root {
-  /* Neutral / surface */
-  --c-bg: #f4f6f9;
-  --c-bg-elevated: #ffffff;
-  --c-surface: #ffffff;
-  --c-surface-hover: #f8fafc;
-  --c-border: #e5e9f0;
-  --c-border-strong: #d4dae5;
-  --c-divider: #eef1f6;
+  /* Premium Dark SaaS Palette */
+  --c-bg: #111827;
+  --c-bg-elevated: #1f2937;
+  --c-surface: #1f2937;
+  --c-surface-hover: #283548;
+  --c-border: #374151;
+  --c-border-strong: #4b5563;
+  --c-divider: #263345;
 
   /* Text */
-  --c-text: #0f1b2d;
-  --c-text-secondary: #51607a;
-  --c-text-muted: #8a96ac;
+  --c-text: #f9fafb;
+  --c-text-secondary: #d1d5db;
+  --c-text-muted: #9ca3af;
   --c-text-on-primary: #ffffff;
 
-  /* Brand */
-  --c-primary: #2563eb;
-  --c-primary-hover: #1d50d9;
-  --c-primary-light: #eff4ff;
-  --c-primary-lighter: #e0e9ff;
-  --c-secondary: #4f46e5;
-  --c-secondary-light: #eef0ff;
+  /* Brand / Accents */
+  --c-primary: #3b82f6;
+  --c-primary-hover: #2563eb;
+  --c-primary-light: rgba(59, 130, 246, 0.15);
+  --c-primary-lighter: rgba(59, 130, 246, 0.25);
+  --c-cyan: #06b6d4;
+  --c-cyan-light: rgba(6, 182, 212, 0.15);
+  --c-secondary: #6366f1;
+  --c-secondary-light: rgba(99, 102, 241, 0.15);
 
   /* Status */
-  --c-success: #16a34a;
-  --c-success-light: #e7f6ee;
-  --c-warning: #d97706;
-  --c-warning-light: #fdf2e0;
-  --c-danger: #dc2626;
-  --c-danger-light: #fdebeb;
-  --c-info: #0891b2;
-  --c-info-light: #e3f6fb;
+  --c-success: #10b981;
+  --c-success-light: rgba(16, 185, 129, 0.15);
+  --c-warning: #f59e0b;
+  --c-warning-light: rgba(245, 158, 11, 0.15);
+  --c-danger: #ef4444;
+  --c-danger-light: rgba(239, 68, 68, 0.15);
+  --c-info: #06b6d4;
+  --c-info-light: rgba(6, 182, 212, 0.15);
 
   /* Sidebar */
-  --c-sidebar-bg: #0f1b2d;
-  --c-sidebar-surface: #182a42;
-  --c-sidebar-text: #a3b0c6;
-  --c-sidebar-text-bright: #ffffff;
-  --c-sidebar-active: #1d3a6b;
-  --c-sidebar-active-text: #ffffff;
-  --c-sidebar-divider: #1f3050;
+  --c-sidebar-bg: #101827;
+  --c-sidebar-surface: #1f2937;
+  --c-sidebar-text: #9ca3af;
+  --c-sidebar-text-bright: #f9fafb;
+  --c-sidebar-active: #1f2937;
+  --c-sidebar-active-text: #f9fafb;
+  --c-sidebar-divider: #1f2937;
 
   /* Typography */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

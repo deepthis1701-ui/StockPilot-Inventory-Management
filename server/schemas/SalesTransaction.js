@@ -9,7 +9,7 @@ const salesTransactionSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true, min: 0 },
   channel: { type: String, enum: ['counter', 'online', 'wholesale', 'other'], default: 'counter' },
   reference: { type: String, trim: true, default: '' },
-  source: { type: String, enum: ['pos', 'manual', 'csv_import'], default: 'manual' },
+  source: { type: String, enum: ['pos', 'manual', 'csv_import', 'demo'], default: 'manual' },
   importBatchId: { type: String, index: true },
   importRowNumber: { type: Number, min: 1 },
   transactionDate: { type: Date, default: Date.now, index: true }
