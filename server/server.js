@@ -191,9 +191,19 @@ async function createInventorySnapshot() {
   return { products: rows, inventory: rows, stats };
 }
 
-async function mlRequest(path) {
-  const response = await fetch(ML_API + path, { signal: AbortSignal.timeout(8000) });
-  if (!response.ok) throw new Error('ML API returned ' + response.status);
+async function mlRequest(path, options = {}) {
+  const response = await fetch(ML_API + path, {
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {})
+    },
+    signal: AbortSignal.timeout(options.timeoutMs || 60000)
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error('ML API returned ' + response.status + ': ' + detail.slice(0, 500));
+  }
   return response.json();
 }
 
@@ -546,12 +556,84 @@ app.get('/api/dashboard', asyncRoute(async (req, res) => {
 app.get('/api/forecast', asyncRoute(async (req, res) => {
   try {
     const days = Math.min(90, Math.max(1, Number(req.query.days) || 30));
-    const product = req.query.product ? '?product=' + encodeURIComponent(req.query.product) + '&days=' + days : '?days=' + days;
-    const data = await mlRequest('/api/forecast' + product);
+    const productFilter = req.query.product ? String(req.query.product) : null;
+    const products = await Product.find({
+      isActive: true,
+      ...(productFilter ? { _id: productFilter } : {})
+    }).sort({ name: 1 }).lean();
+
+    if (productFilter && products.length === 0) {
+      return res.status(404).json({ error: 'Product not found.' });
+    }
+
+    const productIds = products.map((item) => String(item._id));
+    const cutoff = new Date();
+    cutoff.setUTCHours(0, 0, 0, 0);
+    cutoff.setUTCDate(cutoff.getUTCDate() - 729);
+
+    const sales = await SalesTransaction.find({
+      productId: { $in: productIds },
+      transactionDate: { $gte: cutoff }
+    }).sort({ transactionDate: 1 }).lean();
+
+    const salesByProduct = new Map();
+    for (const sale of sales) {
+      if (!salesByProduct.has(sale.productId)) salesByProduct.set(sale.productId, []);
+      salesByProduct.get(sale.productId).push(sale);
+    }
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const endDate = today.toISOString().slice(0, 10);
+
+    const forecastProducts = products.map((product) => {
+      const id = String(product._id);
+      const transactions = salesByProduct.get(id) || [];
+      const firstSale = transactions[0]?.transactionDate
+        ? new Date(transactions[0].transactionDate)
+        : null;
+      const createdAt = new Date(product.createdAt || today);
+      const start = firstSale && firstSale < createdAt ? firstSale : (firstSale || createdAt);
+      start.setUTCHours(0, 0, 0, 0);
+      if (start < cutoff) start.setTime(cutoff.getTime());
+
+      const dayMap = new Map();
+      for (const transaction of transactions) {
+        const day = new Date(transaction.transactionDate);
+        day.setUTCHours(0, 0, 0, 0);
+        const key = day.toISOString().slice(0, 10);
+        dayMap.set(key, (dayMap.get(key) || 0) + Number(transaction.quantity || 0));
+      }
+
+      const dailySales = [];
+      for (let cursor = new Date(start); cursor <= today; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+        const key = cursor.toISOString().slice(0, 10);
+        dailySales.push(Number((dayMap.get(key) || 0).toFixed(4)));
+      }
+
+      return {
+        id,
+        name: product.name,
+        sku: product.sku,
+        last_date: endDate,
+        daily_sales: dailySales
+      };
+    });
+
+    const data = await mlRequest('/api/forecast', {
+      method: 'POST',
+      body: JSON.stringify({
+        forecast_days: days,
+        target_product_id: productFilter,
+        products: forecastProducts
+      }),
+      timeoutMs: 120000
+    });
     return res.json(data);
   } catch (error) {
-    res.status(503).json({
-      error: 'The forecasting service is not available yet. Inventory and transaction features remain operational.',
+    console.error('Demand forecast request failed:', error.message);
+    return res.status(503).json({
+      error: 'Demand forecasting is temporarily unavailable. Inventory and transaction features remain operational.',
       detail: error.message
     });
   }
