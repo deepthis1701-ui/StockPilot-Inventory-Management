@@ -7,7 +7,7 @@ This service deliberately does not load static forecast CSV files at startup.
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from forecasting import generate_forecasts
+from models.forecasting import generate_forecasts
 
 app = Flask(__name__)
 CORS(app)
