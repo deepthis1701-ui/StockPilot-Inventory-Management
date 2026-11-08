@@ -39,7 +39,7 @@ function normalizeProduct(product) {
       ''
   ).toLowerCase();
 
-  let risk = 'Low';
+  let risk = 'Unknown';
 
   if (
     riskValue === 'high' ||
@@ -52,6 +52,8 @@ function normalizeProduct(product) {
     riskValue === 'warning'
   ) {
     risk = 'Medium';
+  } else if (riskValue === 'low' || riskValue === 'healthy') {
+    risk = 'Low';
   }
 
   return {
@@ -318,6 +320,12 @@ export default function Dashboard() {
   const lowStock =
     critical + attention;
 
+  const salesToday = Number(
+    dashboardData?.salesToday?.totalUnits ?? 0
+  );
+
+  const reorderCount = recommendations.length;
+
 
   /* =======================================================
      LOW STOCK PRODUCTS
@@ -461,7 +469,11 @@ export default function Dashboard() {
             <CalendarDays size={15} />
 
             <span>
-              26 October 2026
+              {new Intl.DateTimeFormat('en-IN', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              }).format(new Date())}
             </span>
           </div>
         </div>
@@ -512,7 +524,7 @@ export default function Dashboard() {
               </div>
 
               <div className="card-value">
-                589
+                {formatNumber(salesToday)}
               </div>
             </div>
 
@@ -653,7 +665,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="attention-card-count">
-                  52 products
+                  {formatNumber(reorderCount)} products
                 </div>
 
               </div>
@@ -744,7 +756,11 @@ export default function Dashboard() {
 
           <div>
 
-            {displayedTopProducts.map(
+            {displayedTopProducts.length === 0 ? (
+              <div className="empty-state">
+                No sales recorded yet. Record a sale to see your top-selling products.
+              </div>
+            ) : displayedTopProducts.map(
               (product, index) => {
 
                 const units =
@@ -760,14 +776,7 @@ export default function Dashboard() {
                 const trend =
                   product?.trend ??
                   product?.growth ??
-                  [
-                    '12.4%',
-                    '8.2%',
-                    '6.4%',
-                    '15.1%',
-                    '4.8%',
-                  ][index] ??
-                  '4.8%';
+                  null;
 
                 const trendDown =
                   String(trend).startsWith('-');
@@ -802,21 +811,20 @@ export default function Dashboard() {
 
                     </div>
 
-                    <div
-                      className={`top-product-trend ${
-                        trendDown ? 'down' : 'up'
-                      }`}
-                    >
-
-                      {trendDown ? (
-                        <ArrowDownRight size={13} />
-                      ) : (
-                        <ArrowUpRight size={13} />
-                      )}
-
-                      {trend}
-
-                    </div>
+                    {trend != null && (
+                      <div
+                        className={`top-product-trend ${
+                          trendDown ? 'down' : 'up'
+                        }`}
+                      >
+                        {trendDown ? (
+                          <ArrowDownRight size={13} />
+                        ) : (
+                          <ArrowUpRight size={13} />
+                        )}
+                        {trend}
+                      </div>
+                    )}
 
                   </div>
                 );
@@ -850,7 +858,11 @@ export default function Dashboard() {
 
           <div>
 
-            {lowStockProducts.map(
+            {lowStockProducts.length === 0 ? (
+              <div className="empty-state">
+                No low-stock alerts. Stock risk will be calculated after products and sales history are added.
+              </div>
+            ) : lowStockProducts.map(
               (product, index) => {
 
                 const reorderPoint =
@@ -1178,7 +1190,13 @@ export default function Dashboard() {
 
               <tbody>
 
-                {displayedRecommendations.map(
+                {displayedRecommendations.length === 0 ? (
+                  <tr>
+                    <td colSpan="7">
+                      No reorder recommendations yet. Add products and record sales to calculate replenishment needs.
+                    </td>
+                  </tr>
+                ) : displayedRecommendations.map(
                   (product, index) => {
 
                     const risk =
